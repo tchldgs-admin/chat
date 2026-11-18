@@ -1,7 +1,13 @@
 <?php
 session_start();
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header("Location: login.php");
+    if (!headers_sent()) {
+        header("Location: login.php");
+    }
+    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=login.php"></head><body><script>window.location.replace("login.php");</script></body></html>';
     exit;
 }
 $admin_email = $_SESSION['admin_email'] ?? '管理者';
@@ -28,7 +34,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: "Helvetica Neue", Arial, sans-serif; color: var(--text-main); font-size: 13px; background: #fff; }
 
-        /* ヘッダー周り（admin.phpと共通） */
+        /* ヘッダー周り */
         #top-header {
             height: 54px; background: #ffffff; border-bottom: 1px solid var(--border-color);
             display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
@@ -38,6 +44,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         .brand-logo .icon-box { background: var(--primary-blue); color: #fff; width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
         .header-right { display: flex; align-items: center; gap: 16px; color: #666; }
         .logout-link { color: #666; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e0; }
+        .logout-link:hover { background: #f7fafc; color: #e53e3e; border-color: #feb2b2; }
         
         .layout-wrapper { display: flex; padding-top: 54px; min-height: 100vh; }
         
@@ -58,7 +65,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         .btn-primary { background: var(--primary-blue); color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px;}
         .btn-primary:hover { background: #2188c4; }
 
-        /* ユーザーリスト（本家風） */
+        /* ユーザーリスト */
         .user-list { display: flex; flex-direction: column; gap: 12px; }
         .user-item { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; display: flex; justify-content: space-between; align-items: center; transition: box-shadow 0.2s; }
         .user-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-color: #cbd5e0; }
@@ -174,7 +181,6 @@ $(function() {
         return String(str).replace(/[&<>"']/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; });
     }
 
-    // 担当者一覧の読み込み
     function loadUsers() {
         $.getJSON('admin_users_api.php', { action: 'list' }, function(res) {
             if (!res.success) {
@@ -184,7 +190,6 @@ $(function() {
             
             const $container = $('#user-list-container').empty();
             res.users.forEach(function(u) {
-                // 便宜上、作成日時等を表示。本家のように名前を持たせる場合はテーブル拡張が必要ですが今回はシンプルにEmailを主軸に。
                 const html = `
                 <div class="user-item">
                     <div class="user-info">
@@ -207,10 +212,13 @@ $(function() {
                 </div>`;
                 $container.append(html);
             });
+        }).fail(function(xhr) {
+            if (xhr.status === 401) {
+                window.location.href = 'login.php';
+            }
         });
     }
 
-    // 新規追加ボタン
     $('#btn-add-user').on('click', function() {
         $('#form-user')[0].reset();
         $('#user-id').val('');
@@ -221,7 +229,6 @@ $(function() {
         $('#modal-user').addClass('open');
     });
 
-    // 編集ボタン
     $(document).on('click', '.btn-edit', function() {
         $('#form-user')[0].reset();
         $('#user-id').val($(this).data('id'));
@@ -233,7 +240,6 @@ $(function() {
         $('#modal-user').addClass('open');
     });
 
-    // 削除ボタン
     $(document).on('click', '.btn-delete', function() {
         if (!confirm('この担当者を削除してもよろしいですか？\n※この操作は取り消せません。')) return;
         
@@ -246,7 +252,6 @@ $(function() {
         }, 'json');
     });
 
-    // フォーム送信（追加・編集）
     $('#form-user').on('submit', function(e) {
         e.preventDefault();
         const data = $(this).serializeArray();
@@ -262,12 +267,10 @@ $(function() {
         }, 'json');
     });
 
-    // モーダル閉じる
     $('.modal-close').on('click', function() {
         $(this).closest('.modal-overlay').removeClass('open');
     });
 
-    // 初期読み込み
     loadUsers();
 });
 </script>

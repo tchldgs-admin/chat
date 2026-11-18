@@ -4,7 +4,10 @@ require_once 'db.php';
 
 // すでにログインしている場合は管理画面へリダイレクト
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
-    header("Location: admin.php");
+    if (!headers_sent()) {
+        header("Location: admin.php");
+    }
+    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=admin.php"></head><body><script>window.location.replace("admin.php");</script></body></html>';
     exit;
 }
 
@@ -25,11 +28,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // パスワードの照合
         if ($admin && password_verify($password, $admin['password_hash'])) {
-            // ログイン成功：セッションに情報を保存
+            // セッションIDを再生成（セキュリティ対策）
+            session_regenerate_id(true);
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_email'] = $admin['email'];
             
-            header("Location: admin.php");
+            if (!headers_sent()) {
+                header("Location: admin.php");
+            }
+            echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=admin.php"></head><body><script>window.location.replace("admin.php");</script></body></html>';
             exit;
         } else {
             $error_message = 'メールアドレスまたはパスワードが間違っています。';
