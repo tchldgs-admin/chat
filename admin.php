@@ -12,7 +12,6 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>チケット - TC Plus</title>
-    <!-- Google Material Icons & jQuery -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <style>
@@ -26,101 +25,47 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
             --text-sub: #718096;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
-            color: var(--text-main);
-            background: #ffffff;
-            font-size: 13px;
-        }
+        body { font-family: "Helvetica Neue", Arial, sans-serif; color: var(--text-main); background: #ffffff; font-size: 13px; }
 
-        /* 上部ヘッダー（TC Plus風） */
+        /* 上部ヘッダー */
         #top-header {
-            height: 54px;
-            background: #ffffff;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            z-index: 100;
+            height: 54px; background: #ffffff; border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
         }
         .header-left { display: flex; align-items: center; gap: 36px; height: 100%; }
-        .brand-logo {
-            display: flex; align-items: center; gap: 8px;
-            font-size: 19px; font-weight: bold; color: var(--primary-blue);
-            text-decoration: none;
-        }
-        .brand-logo .icon-box {
-            background: var(--primary-blue); color: #fff;
-            width: 30px; height: 30px; border-radius: 7px;
-            display: flex; align-items: center; justify-content: center;
-        }
+        .brand-logo { display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: bold; color: var(--primary-blue); text-decoration: none; }
+        .brand-logo .icon-box { background: var(--primary-blue); color: #fff; width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
         .top-nav { display: flex; height: 100%; list-style: none; gap: 6px; }
-        .top-nav li a {
-            display: flex; align-items: center; height: 100%; padding: 0 14px;
-            text-decoration: none; color: #555; font-weight: bold; font-size: 14px;
-            position: relative;
-        }
-        .top-nav li.active a {
-            color: var(--primary-blue);
-            border-bottom: 3px solid var(--primary-blue);
-        }
+        .top-nav li a { display: flex; align-items: center; height: 100%; padding: 0 14px; text-decoration: none; color: #555; font-weight: bold; font-size: 14px; }
+        .top-nav li.active a { color: var(--primary-blue); border-bottom: 3px solid var(--primary-blue); }
         .top-nav li.disabled a { color: #a0aec0; cursor: default; }
-        .ticket-badge {
-            background: #e53e3e; color: #fff; font-size: 11px; font-weight: bold;
-            padding: 1px 6px; border-radius: 10px; margin-left: 5px; line-height: 1.4;
-        }
+        .ticket-badge { background: #e53e3e; color: #fff; font-size: 11px; font-weight: bold; padding: 1px 6px; border-radius: 10px; margin-left: 5px; }
+        
         .header-right { display: flex; align-items: center; gap: 16px; color: #666; }
-        .form-link-btn {
-            font-size: 12px; color: var(--primary-blue); text-decoration: none;
-            border: 1px solid var(--primary-blue); padding: 4px 10px; border-radius: 4px;
-        }
+        .form-link-btn { font-size: 12px; color: var(--primary-blue); text-decoration: none; border: 1px solid var(--primary-blue); padding: 4px 10px; border-radius: 4px; }
         .form-link-btn:hover { background: #ebf8ff; }
-        .logout-link {
-            color: #666; text-decoration: none; font-size: 12px;
-            display: inline-flex; align-items: center; gap: 4px;
-            padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e0;
-        }
+        .logout-link { color: #666; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e0; }
         .logout-link:hover { background: #f7fafc; color: #e53e3e; border-color: #feb2b2; }
 
-        /* レイアウト全体 */
         .layout-wrapper { display: flex; padding-top: 54px; min-height: 100vh; }
 
         /* 左サイドバー */
-        .sidebar {
-            width: 185px;
-            background: var(--sidebar-bg);
-            border-right: 1px solid var(--border-color);
-            padding: 16px 0;
-            position: fixed;
-            top: 54px; bottom: 0; left: 0;
-            overflow-y: auto;
-        }
+        .sidebar { width: 185px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 16px 0; position: fixed; top: 54px; bottom: 0; left: 0; overflow-y: auto; }
         .side-menu { list-style: none; }
-        .side-menu li a {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 18px; color: #4a5568; text-decoration: none; font-size: 13px;
-            transition: background 0.15s;
-        }
+        .side-menu li a { display: flex; align-items: center; gap: 10px; padding: 10px 18px; color: #4a5568; text-decoration: none; font-size: 13px; transition: background 0.15s; }
         .side-menu li a:hover { background: #e8edf3; }
-        .side-menu li.active a {
-            background: #e2ecf7; color: #1a365d; font-weight: bold;
-            border-left: 3px solid var(--primary-blue);
-        }
+        .side-menu li.active a { background: #e2ecf7; color: #1a365d; font-weight: bold; border-left: 3px solid var(--primary-blue); }
         .side-menu .material-icons-round { font-size: 18px; color: #718096; }
         .side-menu li.status-11 .material-icons-round { color: #29a3e5; }
         .side-divider { border: none; border-top: 1px solid #dce3ec; margin: 12px 14px; }
         .side-buttons { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-        .btn-navy {
-            background: var(--navy-btn); color: #fff; border: none;
-            padding: 9px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;
-            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
-            text-decoration: none; transition: background 0.15s;
-        }
+        .btn-navy { background: var(--navy-btn); color: #fff; border: none; padding: 9px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
         .btn-navy:hover { background: var(--navy-btn-hover); }
         .btn-navy .material-icons-round { font-size: 16px; }
+        
+        /* メニューのグループタイトル */
+        .side-group-title { font-size: 11px; color: #a0aec0; font-weight: bold; padding: 0 18px; margin-bottom: 4px; margin-top: 16px;}
 
         /* メインコンテンツ */
         .main-content { flex: 1; margin-left: 185px; padding: 20px 28px; }
@@ -128,200 +73,93 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         .page-title { font-size: 20px; font-weight: bold; margin-bottom: 16px; color: #2d3748; }
 
         /* 検索ボックス */
-        .search-box {
-            background: #f8fafc;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 12px 14px;
-            margin-bottom: 14px;
-        }
+        .search-box { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px 14px; margin-bottom: 14px; }
         .search-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .form-control {
-            height: 32px; padding: 4px 10px; border: 1px solid #cbd5e0;
-            border-radius: 3px; font-size: 12px; background: #fff; color: #333;
-        }
+        .form-control { height: 32px; padding: 4px 10px; border: 1px solid #cbd5e0; border-radius: 3px; font-size: 12px; background: #fff; }
         .form-control:focus { outline: none; border-color: var(--primary-blue); }
-        .search-detail-area {
-            display: none; margin-top: 10px; padding-top: 10px;
-            border-top: 1px dashed #cbd5e0; gap: 12px; align-items: center;
-        }
+        .search-detail-area { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e0; gap: 12px; align-items: center; }
         .search-detail-area.open { display: flex; flex-wrap: wrap; }
-        .detail-toggle {
-            color: #4a5568; cursor: pointer; font-size: 12px;
-            display: inline-flex; align-items: center; gap: 2px; user-select: none;
-        }
-        .btn-search {
-            background: var(--navy-btn); color: #fff; border: none; height: 32px;
-            padding: 0 14px; border-radius: 3px; font-size: 12px; font-weight: bold;
-            cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
-        }
-        .btn-clear {
-            background: #fff; color: #4a5568; border: 1px solid #cbd5e0; height: 32px;
-            width: 32px; border-radius: 3px; cursor: pointer;
-            display: inline-flex; align-items: center; justify-content: center;
-        }
+        .detail-toggle { color: #4a5568; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 2px; user-select: none; }
+        .btn-search { background: var(--navy-btn); color: #fff; border: none; height: 32px; padding: 0 14px; border-radius: 3px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+        .btn-clear { background: #fff; color: #4a5568; border: 1px solid #cbd5e0; height: 32px; width: 32px; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 
-        /* ツールバー（件数・CSV） */
-        .list-toolbar {
-            display: flex; justify-content: flex-end; align-items: center;
-            gap: 12px; margin-bottom: 10px; font-size: 12px;
-        }
+        /* ツールバー */
+        .list-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 12px; }
 
         /* チケット一覧テーブル */
         .ticket-table-wrap { border-top: 1px solid var(--border-color); }
-        .ticket-header-row {
-            display: grid;
-            grid-template-columns: 34px 28px 1fr 170px 140px 150px 110px 80px;
-            align-items: center;
-            background: #f8fafc;
-            border-bottom: 1px solid var(--border-color);
-            padding: 9px 8px;
-            font-weight: bold;
-            color: #4a5568;
-            font-size: 12px;
-        }
+        .ticket-header-row { display: grid; grid-template-columns: 34px 28px 1fr 170px 140px 150px 110px 80px; align-items: center; background: #f8fafc; border-bottom: 1px solid var(--border-color); padding: 9px 8px; font-weight: bold; color: #4a5568; font-size: 12px; }
         .sort-col { cursor: pointer; display: flex; align-items: center; gap: 2px; user-select: none; }
         .sort-col:hover { color: var(--primary-blue); }
 
-        /* 一括操作バー */
-        .bulk-bar {
-            display: none; background: #ebf8ff; border-bottom: 1px solid #bee3f8;
-            padding: 7px 12px; align-items: center; gap: 10px;
-        }
+        .bulk-bar { display: none; background: #ebf8ff; border-bottom: 1px solid #bee3f8; padding: 7px 12px; align-items: center; gap: 10px; }
         .bulk-bar.active { display: flex; }
 
-        /* 各チケット行 */
         .ticket-item { border-bottom: 1px solid var(--border-color); transition: background 0.1s; }
-        .ticket-item.alert-warning { background: #fefcbf; } /* 18時間以上経過 */
-        .ticket-item.alert-danger { background: #fed7d7; }  /* 24時間以上経過 */
-        .ticket-row {
-            display: grid;
-            grid-template-columns: 34px 28px 1fr 170px 140px 150px 110px 80px;
-            align-items: center;
-            padding: 10px 8px;
-            cursor: pointer;
-        }
+        .ticket-item.alert-warning { background: #fefcbf; }
+        .ticket-item.alert-danger { background: #fed7d7; }
+        .ticket-row { display: grid; grid-template-columns: 34px 28px 1fr 170px 140px 150px 110px 80px; align-items: center; padding: 10px 8px; cursor: pointer; }
         .ticket-row:hover { background: rgba(41, 163, 229, 0.06); }
         .ticket-item.unread .col-subject { font-weight: bold; }
-        .unread-dot {
-            width: 8px; height: 8px; border-radius: 50%; display: inline-block;
-            background: transparent; cursor: pointer;
-        }
+        .unread-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: transparent; cursor: pointer; }
         .ticket-item.unread .unread-dot { background: var(--primary-blue); }
-        .col-subject {
-            display: flex; align-items: center; gap: 6px;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px;
-            color: #2b6cb0;
-        }
+        .col-subject { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; color: #2b6cb0; }
         .col-subject .mail-icon { font-size: 15px; color: #718096; }
-        .col-visitor {
-            display: flex; align-items: center; gap: 5px;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px;
-        }
+        .col-visitor { display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
         .col-visitor .material-icons-round { font-size: 15px; color: #a0aec0; }
-        .col-assignee { color: #4a5568; font-size: 12px; }
-        .col-elapsed { color: #4a5568; font-size: 12px; }
-        .col-site { color: #4a5568; font-size: 12px; }
+        .col-assignee, .col-elapsed, .col-site { color: #4a5568; font-size: 12px; }
         .col-id { color: #4a5568; font-size: 12px; text-align: right; padding-right: 8px; }
-        .status-pill {
-            font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: bold; color: #fff;
-        }
+        
+        .status-pill { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: bold; color: #fff; }
         .st-11 { background: #e53e3e; }
         .st-12 { background: #3182ce; }
         .st-13 { background: #d69e2e; }
         .st-21 { background: #38a169; }
         .st-31 { background: #718096; }
 
-        /* 展開されたチケット詳細（スレッド＆返信フォーム） */
-        .ticket-detail-panel {
-            display: none;
-            background: #f9fbfd;
-            border-top: 1px solid #cbd5e0;
-            padding: 18px 24px 24px 42px;
-        }
+        /* スレッド詳細 */
+        .ticket-detail-panel { display: none; background: #f9fbfd; border-top: 1px solid #cbd5e0; padding: 18px 24px 24px 42px; }
         .ticket-item.expanded .ticket-detail-panel { display: block; }
         .ticket-item.expanded .ticket-row { background: #edf2f7; font-weight: bold; }
-
-        .detail-meta-bar {
-            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
-            background: #fff; border: 1px solid var(--border-color); border-radius: 4px;
-            padding: 10px 14px; margin-bottom: 14px; gap: 10px;
-        }
+        .detail-meta-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: #fff; border: 1px solid var(--border-color); border-radius: 4px; padding: 10px 14px; margin-bottom: 14px; gap: 10px; }
         .meta-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .meta-label { font-size: 11px; color: var(--text-sub); font-weight: bold; }
 
-        /* スレッド履歴 */
         .thread-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-        .event-card {
-            background: #fff; border: 1px solid var(--border-color); border-radius: 4px;
-            overflow: hidden;
-        }
+        .event-card { background: #fff; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; }
         .event-card.memo { background: #fefcbf; border-color: #f6e05e; }
         .event-card.support { border-left: 4px solid var(--primary-blue); }
         .event-card.customer { border-left: 4px solid #a0aec0; }
-        .event-header {
-            padding: 9px 14px; display: flex; justify-content: space-between; align-items: center;
-            cursor: pointer; background: rgba(0,0,0,0.015);
-        }
+        .event-header { padding: 9px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: rgba(0,0,0,0.015); }
         .event-header:hover { background: rgba(0,0,0,0.03); }
         .event-sender { font-weight: bold; display: flex; align-items: center; gap: 8px; }
         .event-preview { color: #718096; font-weight: normal; font-size: 12px; margin-left: 8px; }
-        .event-body {
-            padding: 14px; border-top: 1px solid #edf2f7;
-            white-space: pre-wrap; line-height: 1.65; font-size: 13px;
-        }
+        .event-body { padding: 14px; border-top: 1px solid #edf2f7; white-space: pre-wrap; line-height: 1.65; font-size: 13px; }
         .event-card.collapsed .event-body { display: none; }
         .event-card:not(.collapsed) .event-preview { display: none; }
 
         /* 返信エディタボックス */
-        .reply-editor-box {
-            background: #fff; border: 1px solid #cbd5e0; border-radius: 4px; padding: 14px;
-        }
+        .reply-editor-box { background: #fff; border: 1px solid #cbd5e0; border-radius: 4px; padding: 14px; }
         .reply-tabs { display: flex; gap: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
-        .reply-tab {
-            padding: 5px 12px; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 12px;
-            border: 1px solid transparent; background: #edf2f7; color: #4a5568;
-        }
+        .reply-tab { padding: 5px 12px; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 12px; border: 1px solid transparent; background: #edf2f7; color: #4a5568; }
         .reply-tab.active[data-type="support"] { background: var(--primary-blue); color: #fff; }
         .reply-tab.active[data-type="memo"] { background: #ecc94b; color: #744210; }
         .reply-to-info { font-size: 12px; color: #4a5568; margin-bottom: 8px; }
-        .reply-textarea {
-            width: 100%; height: 130px; padding: 10px; border: 1px solid #cbd5e0;
-            border-radius: 3px; font-size: 13px; font-family: inherit; resize: vertical;
-        }
+        .reply-textarea { width: 100%; height: 130px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 3px; font-size: 13px; font-family: inherit; resize: vertical; }
         .reply-textarea.memo-mode { background: #fffff0; border-color: #ecc94b; }
-        .reply-footer {
-            display: flex; justify-content: space-between; align-items: center; margin-top: 10px;
-        }
-        .btn-send {
-            background: var(--primary-blue); color: #fff; border: none;
-            padding: 7px 20px; border-radius: 3px; font-weight: bold; cursor: pointer;
-        }
+        .reply-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        
+        .btn-send { background: var(--primary-blue); color: #fff; border: none; padding: 7px 20px; border-radius: 3px; font-weight: bold; cursor: pointer; }
         .btn-send:hover { background: #2188c4; }
-        .btn-update-only {
-            background: #edf2f7; color: #2d3748; border: 1px solid #cbd5e0;
-            padding: 7px 14px; border-radius: 3px; font-weight: bold; cursor: pointer; margin-right: 6px;
-        }
+        .btn-update-only { background: #edf2f7; color: #2d3748; border: 1px solid #cbd5e0; padding: 7px 14px; border-radius: 3px; font-weight: bold; cursor: pointer; margin-right: 6px; }
 
         /* モーダル */
-        .modal-overlay {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-            z-index: 200; align-items: center; justify-content: center;
-        }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
         .modal-overlay.open { display: flex; }
-        .modal-dialog {
-            background: #fff; width: 540px; max-width: 94vw; border-radius: 6px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden;
-        }
-        .modal-header {
-            padding: 14px 18px; background: #f8fafc; border-bottom: 1px solid var(--border-color);
-            display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 15px;
-        }
+        .modal-dialog { background: #fff; width: 540px; max-width: 94vw; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
+        .modal-header { padding: 14px 18px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 15px; }
         .modal-body { padding: 18px; max-height: 75vh; overflow-y: auto; }
-        .modal-footer {
-            padding: 12px 18px; background: #f8fafc; border-top: 1px solid var(--border-color);
-            display: flex; justify-content: flex-end; gap: 8px;
-        }
+        .modal-footer { padding: 12px 18px; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 8px; }
         .m-group { margin-bottom: 12px; }
         .m-group label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 12px; }
         .m-group input, .m-group select, .m-group textarea { width: 100%; }
@@ -329,7 +167,6 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
 </head>
 <body>
 
-<!-- 上部ヘッダー -->
 <header id="top-header">
     <div class="header-left">
         <a href="admin.php" class="brand-logo">
@@ -354,6 +191,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
 <div class="layout-wrapper">
     <!-- 左サイドバー -->
     <aside class="sidebar">
+        <div class="side-group-title">メインメニュー</div>
         <ul class="side-menu" id="side-status-menu">
             <li class="active" data-status="active"><a href="#"><span class="material-icons-round">list</span>一覧</a></li>
             <li class="status-11" data-status="11"><a href="#"><span class="material-icons-round">hourglass_top</span>未対応</a></li>
@@ -367,6 +205,12 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
             <button type="button" class="btn-navy" id="btn-open-create"><span class="material-icons-round">add</span>チケットを追加</button>
             <button type="button" class="btn-navy" id="btn-open-settings"><span class="material-icons-round">settings</span>チケット設定</button>
         </div>
+        
+        <!-- 【追加】担当者管理へのリンク -->
+        <div class="side-group-title">設定</div>
+        <ul class="side-menu">
+            <li><a href="admin_users.php"><span class="material-icons-round">manage_accounts</span>担当者管理</a></li>
+        </ul>
     </aside>
 
     <!-- メインエリア -->
@@ -565,7 +409,6 @@ $(function() {
         });
     }
 
-    // チケット一覧の読み込み
     function loadTickets() {
         const params = $('#search-form').serializeArray();
         params.push({name: 'action', value: 'list'});
@@ -579,7 +422,6 @@ $(function() {
             appConfig = res.config;
             populateSelects();
 
-            // 未対応バッジ更新
             if (res.unanswered_count > 0) {
                 $('#header-badge').text(res.unanswered_count).show();
             } else {
@@ -634,7 +476,6 @@ $(function() {
         });
     }
 
-    // プルダウン選択肢の反映
     function populateSelects() {
         const agents = appConfig.agents || [];
         const cats = appConfig.categories || [];
@@ -657,7 +498,6 @@ $(function() {
             cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join(''));
     }
 
-    // チケット詳細の展開（スレッド読み込み）
     function loadTicketDetail(ticketId) {
         const $panel = $(`#detail-panel-${ticketId}`);
         $.getJSON('admin_api.php', {action: 'events', ticket_id: ticketId}, function(res) {
@@ -743,7 +583,6 @@ $(function() {
         });
     }
 
-    // チケット行のクリックで展開・折りたたみ
     $(document).on('click', '.ticket-row', function() {
         const $item = $(this).closest('.ticket-item');
         const ticketId = $item.data('id');
@@ -757,12 +596,10 @@ $(function() {
         }
     });
 
-    // スレッド内のメッセージ開閉
     $(document).on('click', '.event-header', function() {
         $(this).closest('.event-card').toggleClass('collapsed');
     });
 
-    // 返信タブ切り替え（お客様返信 / 社内メモ）
     $(document).on('click', '.reply-tab', function() {
         const $box = $(this).closest('.reply-editor-box');
         const type = $(this).data('type');
@@ -781,7 +618,6 @@ $(function() {
         }
     });
 
-    // 返信・メモの送信
     $(document).on('click', '.btn-submit-reply', function() {
         const $btn = $(this);
         const ticketId = $btn.data('id');
@@ -812,7 +648,6 @@ $(function() {
         }, 'json');
     });
 
-    // ステータスのみ更新
     $(document).on('click', '.btn-status-only', function() {
         const ticketId = $(this).data('id');
         const status = $(this).closest('.reply-editor-box').find('.reply-status-select').val();
@@ -826,7 +661,6 @@ $(function() {
         }, 'json');
     });
 
-    // 担当者・カテゴリのインライン変更
     $(document).on('change', '.inline-update', function() {
         $.post('admin_api.php', {
             action: 'update_ticket',
@@ -838,7 +672,6 @@ $(function() {
         }, 'json');
     });
 
-    // ゴミ箱へ移動
     $(document).on('click', '.btn-trash-ticket', function() {
         if (!confirm('このチケットをゴミ箱へ移動しますか？')) return;
         $.post('admin_api.php', {
@@ -851,7 +684,6 @@ $(function() {
         }, 'json');
     });
 
-    // 未読ドットクリックで既読/未読切替
     $(document).on('click', '.unread-dot', function() {
         const nextVal = $(this).data('read') == 1 ? 0 : 1;
         $.post('admin_api.php', {
@@ -864,7 +696,6 @@ $(function() {
         }, 'json');
     });
 
-    // 左サイドバーのステータス絞り込み
     $('#side-status-menu li').on('click', function(e) {
         e.preventDefault();
         $('#side-status-menu li').removeClass('active');
@@ -874,7 +705,6 @@ $(function() {
         loadTickets();
     });
 
-    // 検索フォーム送信＆クリア
     $('#search-form').on('submit', function(e) {
         e.preventDefault();
         loadTickets();
@@ -887,7 +717,6 @@ $(function() {
         $('#search-detail-area').toggleClass('open');
     });
 
-    // ソート機能
     $('.sort-col').on('click', function() {
         const col = $(this).data('sort');
         if (sortBy === col) {
@@ -899,7 +728,6 @@ $(function() {
         loadTickets();
     });
 
-    // 一括選択・一括操作
     function updateBulkBar() {
         const count = $('.row-check:checked').length;
         if (count > 0) {
@@ -937,7 +765,6 @@ $(function() {
         }, 'json');
     });
 
-    // モーダル操作（チケット追加 / チケット設定）
     $('#btn-open-create').on('click', function() {
         $('#form-create-ticket')[0].reset();
         $('#modal-create').addClass('open');
@@ -982,7 +809,6 @@ $(function() {
         $(this).closest('.modal-overlay').removeClass('open');
     });
 
-    // 初回読み込み
     loadTickets();
 });
 </script>
