@@ -18,7 +18,6 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>設定 | 担当者管理 - TC Plus</title>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <style>
         :root {
@@ -33,6 +32,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: "Helvetica Neue", Arial, sans-serif; color: var(--text-main); font-size: 13px; background: #fff; }
+        svg { vertical-align: middle; flex-shrink: 0; }
 
         /* ヘッダー周り */
         #top-header {
@@ -54,7 +54,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         .side-menu li a { display: flex; align-items: center; gap: 10px; padding: 10px 18px; color: #4a5568; text-decoration: none; font-size: 13px; }
         .side-menu li a:hover { background: #e8edf3; }
         .side-menu li.active a { background: #e2ecf7; color: #1a365d; font-weight: bold; border-left: 3px solid var(--primary-blue); }
-        .side-menu .material-icons-round { font-size: 18px; color: #718096; }
+        .side-menu svg { color: #718096; }
         .side-group-title { font-size: 11px; color: #a0aec0; font-weight: bold; padding: 0 18px; margin-bottom: 4px; margin-top: 16px;}
 
         /* メインエリア */
@@ -70,7 +70,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         .user-item { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; display: flex; justify-content: space-between; align-items: center; transition: box-shadow 0.2s; }
         .user-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-color: #cbd5e0; }
         .user-info { display: flex; align-items: center; gap: 16px; }
-        .user-icon { width: 42px; height: 42px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #718096; font-size: 24px;}
+        .user-icon { width: 42px; height: 42px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #718096; }
         .user-details { display: flex; flex-direction: column; gap: 4px; }
         .user-name { font-size: 15px; font-weight: bold; color: #2d3748; }
         .user-email { font-size: 12px; color: #718096; display: flex; align-items: center; gap: 4px; }
@@ -81,14 +81,13 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         .btn-action:hover { background: #e2e8f0; }
         .btn-edit:hover { color: var(--primary-blue); border-color: #bee3f8; background: #ebf8ff;}
         .btn-delete:hover { color: #e53e3e; border-color: #fed7d7; background: #fff5f5;}
-        .btn-action .material-icons-round { font-size: 18px; }
 
         /* モーダル */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
         .modal-overlay.open { display: flex; }
         .modal-dialog { background: #fff; width: 480px; max-width: 90vw; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
         .modal-header { padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 16px; color: #2d3748; }
-        .modal-close { cursor: pointer; color: #a0aec0; }
+        .modal-close { cursor: pointer; color: #a0aec0; display: inline-flex; }
         .modal-close:hover { color: #4a5568; }
         .modal-body { padding: 20px; }
         .modal-footer { padding: 16px 20px; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
@@ -107,13 +106,21 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
 <header id="top-header">
     <div class="header-left">
         <a href="admin.php" class="brand-logo">
-            <span class="icon-box"><span class="material-icons-round">forum</span></span>
+            <span class="icon-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            </span>
             <span>TC Plus</span>
         </a>
     </div>
     <div class="header-right">
-        <span style="font-size:12px;"><span class="material-icons-round" style="font-size:18px; vertical-align:middle;">account_circle</span> <?php echo htmlspecialchars($admin_email, ENT_QUOTES, 'UTF-8'); ?></span>
-        <a href="logout.php" class="logout-link"><span class="material-icons-round" style="font-size:15px;">logout</span>ログアウト</a>
+        <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+            <?php echo htmlspecialchars($admin_email, ENT_QUOTES, 'UTF-8'); ?>
+        </span>
+        <a href="logout.php" class="logout-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+            ログアウト
+        </a>
     </div>
 </header>
 
@@ -121,11 +128,21 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
     <aside class="sidebar">
         <div class="side-group-title">メインメニュー</div>
         <ul class="side-menu">
-            <li><a href="admin.php"><span class="material-icons-round">list_alt</span>チケット管理</a></li>
+            <li>
+                <a href="admin.php">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+                    <span>チケット管理</span>
+                </a>
+            </li>
         </ul>
         <div class="side-group-title">設定</div>
         <ul class="side-menu">
-            <li class="active"><a href="admin_users.php"><span class="material-icons-round">manage_accounts</span>担当者管理</a></li>
+            <li class="active">
+                <a href="admin_users.php">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                    <span>担当者管理</span>
+                </a>
+            </li>
         </ul>
     </aside>
 
@@ -134,7 +151,8 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         <div class="page-title-area">
             <h1 class="page-title">担当者管理</h1>
             <button type="button" class="btn-primary" id="btn-add-user">
-                <span class="material-icons-round" style="font-size:18px;">person_add</span>担当者を追加
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                <span>担当者を追加</span>
             </button>
         </div>
 
@@ -149,7 +167,9 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
     <div class="modal-dialog">
         <div class="modal-header">
             <span id="modal-title">担当者を追加</span>
-            <span class="material-icons-round modal-close">close</span>
+            <span class="modal-close">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </span>
         </div>
         <form id="form-user">
             <div class="modal-body">
@@ -193,20 +213,23 @@ $(function() {
                 const html = `
                 <div class="user-item">
                     <div class="user-info">
-                        <div class="user-icon"><span class="material-icons-round">person</span></div>
+                        <div class="user-icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        </div>
                         <div class="user-details">
                             <div class="user-name">${esc(u.email.split('@')[0])} <span class="badge-admin">管理者</span></div>
                             <div class="user-email">
-                                <span class="material-icons-round" style="font-size:14px;">mail</span> ${esc(u.email)}
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                                ${esc(u.email)}
                             </div>
                         </div>
                     </div>
                     <div class="user-actions">
                         <button type="button" class="btn-action btn-edit" title="編集" data-id="${u.id}" data-email="${esc(u.email)}">
-                            <span class="material-icons-round">edit</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                         </button>
                         <button type="button" class="btn-action btn-delete" title="削除" data-id="${u.id}">
-                            <span class="material-icons-round">delete</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                         </button>
                     </div>
                 </div>`;
