@@ -45,9 +45,26 @@ $default_config = [
 if (!file_exists($config_file)) {
     file_put_contents($config_file, json_encode($default_config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
-$config = array_merge($default_config, json_decode(file_get_contents($config_file), true) ?: []);
+$loaded_config = json_decode(file_get_contents($config_file), true);
+$config = array_merge($default_config, is_array($loaded_config) ? $loaded_config : []);
 
-// 経過時間のフォーマット関数（TC Plus風）
+// 共通メール送信関数（差出人名・署名・-fオプション対応）
+function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
+    $encoded_name = mb_encode_mimeheader($from_name, "UTF-8", "B", "\n");
+    $headers  = "From: {$encoded_name} <{$from_email}>\r\n";
+    $headers .= "Reply-To: {$from_email}\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $headers .= "Content-Transfer-Encoding: 8bit";
+
+    $additional_params = '';
+    if (filter_var($from_email, FILTER_VALIDATE_EMAIL)) {
+        $additional_params = "-f" . $from_email;
+    }
+    return mb_send_mail($to, $subject, $body, $headers, $additional_params);
+}
+
+// 経過時間のフォーマット関数
 function format_elapsed($datetime_str) {
     $ts = strtotime($datetime_str);
     $now = time();
@@ -84,7 +101,7 @@ if ($action === 'export_csv') {
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="tickets_' . date('Ymd_His') . '.csv"');
     $out = fopen('php://output', 'w');
-    fwrite($out, "\xEF\xBB\xBF"); // Excel文字化け防止BOM
+    fwrite($out, "\xEF\xBB\xBF");
 
     fputcsv($out, ['チケットID', 'ステータス', '件名', '訪問者名', 'メールアドレス', '担当者', 'カテゴリ', 'サイト名', '作成日時', '最終更新日時']);
     foreach ($rows as $r) {
@@ -164,7 +181,6 @@ try {
             $sql .= " WHERE " . implode(" AND ", $where);
         }
 
-        // ソート順
         $sort_map = [
             'subject'   => 'subject',
             'requester' => 'customer_name',
@@ -194,7 +210,6 @@ try {
             }
         }
 
-        // 未対応（status=11）の総件数（ヘッダーの赤丸バッジ用）
         $unanswered_count = (int)$pdo->query("SELECT COUNT(*) FROM tickets WHERE status = 11")->fetchColumn();
 
         echo json_encode([
@@ -212,7 +227,6 @@ try {
     if ($action === 'events') {
         $ticket_id = (int)($_GET['ticket_id'] ?? 0);
 
-        // 開いたら自動的に既読にする
         $pdo->prepare("UPDATE tickets SET is_read = 1 WHERE id = ?")->execute([$ticket_id]);
 
         $stmt = $pdo->prepare("SELECT * FROM tickets WHERE id = ?");
@@ -241,7 +255,7 @@ try {
     // --------------------------------------------------
     if ($action === 'reply') {
         $ticket_id  = (int)($_POST['ticket_id'] ?? 0);
-        $reply_type = $_POST['reply_type'] ?? 'support'; // 'support' or 'memo'
+        $reply_type = $_POST['reply_type'] ?? 'support';
         $body       = trim($_POST['body'] ?? '');
         $status     = (int)($_POST['status'] ?? 12);
 
@@ -266,22 +280,25 @@ try {
 
         $pdo->commit();
 
-        // 「お客様へ返信」で本文がある場合は、お客様へメール通知を送信
+        // 「お客様へ返信」の場合は、返信のたびにお客様へメール通知を送信
         if ($reply_type === 'support' && $body !== '') {
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
             $domain = $_SERVER['HTTP_HOST'];
             $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
             $ticket_url = $protocol . $domain . $dir . "/view.php?id=" . $ticket['id'] . "&key=" . $ticket['secret_key'];
 
+            $signature = $config['signature'] ?? '';
             $mail_subject = "Re: {$ticket['subject']}（チケットID: #{$ticket['id']}）";
             $mail_body = "{$ticket['customer_name']} 様\n\n"
                        . "{$body}\n\n"
                        . "■これまでのやり取りの確認・追加のご返信はこちら\n"
                        . "{$ticket_url}\n\n"
-                       . $config['signature'];
+                       . $signature;
 
-            $headers = "From: " . mb_encode_mimeheader($config['from_name']) . " <{$config['from_email']}>";
-            mb_send_mail($ticket['customer_email'], $mail_subject, $mail_body, $headers);
+            $mail_ok = send_tc_mail($ticket['customer_email'], $mail_subject, $mail_body, $config['from_email'], $config['from_name']);
+            if (!$mail_ok) {
+                throw new Exception('メッセージは保存されましたが、メール送信に失敗しました。サーバーのメール設定を確認してください。');
+            }
         }
 
         echo json_encode(['success' => true]);
@@ -357,15 +374,18 @@ try {
             $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
             $ticket_url = $protocol . $domain . $dir . "/view.php?id=" . $ticket_id . "&key=" . $secret_key;
 
+            $signature = $config['signature'] ?? '';
             $mail_subject = "{$subject}（チケットID: #{$ticket_id}）";
             $mail_body = "{$name} 様\n\n"
                        . "{$body}\n\n"
                        . "■内容の確認・ご返信はこちら\n"
                        . "{$ticket_url}\n\n"
-                       . $config['signature'];
+                       . $signature;
 
-            $headers = "From: " . mb_encode_mimeheader($config['from_name']) . " <{$config['from_email']}>";
-            mb_send_mail($email, $mail_subject, $mail_body, $headers);
+            $mail_ok = send_tc_mail($email, $mail_subject, $mail_body, $config['from_email'], $config['from_name']);
+            if (!$mail_ok) {
+                throw new Exception('チケットは作成されましたが、メール送信に失敗しました。');
+            }
         }
 
         echo json_encode(['success' => true, 'ticket_id' => $ticket_id]);
@@ -384,7 +404,9 @@ try {
             'agents'     => array_values(array_filter(array_map('trim', explode("\n", $_POST['agents'] ?? '')))),
             'categories' => array_values(array_filter(array_map('trim', explode("\n", $_POST['categories'] ?? '')))),
         ];
-        file_put_contents($config_file, json_encode($new_config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        if (file_put_contents($config_file, json_encode($new_config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) === false) {
+            throw new Exception('設定ファイル（config.json）の保存に失敗しました。ファイルの書き込み権限を確認してください。');
+        }
         echo json_encode(['success' => true]);
         exit;
     }

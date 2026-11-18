@@ -25,23 +25,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt_msg = $pdo->prepare("INSERT INTO messages (ticket_id, sender_type, body) VALUES (?, 'customer', ?)");
         $stmt_msg->execute([$ticket_id, $reply_body]);
 
-        // 2. お客様から返信があったので、ステータスを「11（未対応）」に戻し、最終更新日時を更新
-        $stmt_upd = $pdo->prepare("UPDATE tickets SET status = 11, updated_at = NOW() WHERE id = ?");
+        // 2. お客様から返信があったので、ステータスを「11（未対応）」に戻し、未読フラグ(is_read=0)と最終更新日時を更新
+        $columns = $pdo->query("SHOW COLUMNS FROM tickets")->fetchAll(PDO::FETCH_COLUMN);
+        if (in_array('is_read', $columns)) {
+            $stmt_upd = $pdo->prepare("UPDATE tickets SET status = 11, is_read = 0, updated_at = NOW() WHERE id = ?");
+        } else {
+            $stmt_upd = $pdo->prepare("UPDATE tickets SET status = 11, updated_at = NOW() WHERE id = ?");
+        }
         $stmt_upd->execute([$ticket_id]);
 
         $pdo->commit();
         
-        // 二重送信防止のためリダイレクト
         header("Location: view.php?id=" . urlencode($ticket_id) . "&key=" . urlencode($secret_key) . "&sent=1");
         exit;
     }
 }
 
 if (isset($_GET['sent'])) {
-    $info_message = '返信を送信しました。';
+    $info_message = '追加の返信を送信しました。担当者からの回答をお待ちください。';
 }
 
-// メッセージ履歴を取得（社内メモ 'memo' はお客様に見せないように除外！）
+// メッセージ履歴を取得（社内メモ 'memo' はお客様に見せないように除外）
 $stmt_msgs = $pdo->prepare("SELECT * FROM messages WHERE ticket_id = ? AND sender_type != 'memo' ORDER BY created_at ASC");
 $stmt_msgs->execute([$ticket_id]);
 $messages = $stmt_msgs->fetchAll();
@@ -80,12 +84,14 @@ $st = $status_labels[$ticket['status']] ?? ['label' => '確認中', 'color' => '
         .btn-reply { background: #3182ce; color: #fff; border: none; padding: 10px 24px; font-size: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; }
         .btn-reply:hover { background: #2b6cb0; }
         .alert-info { background: #c6f6d5; color: #22543d; padding: 12px; border-radius: 4px; margin-bottom: 16px; font-size: 14px; }
+        .new-ticket-note { margin-top: 16px; font-size: 12px; color: #718096; }
+        .new-ticket-note a { color: #3182ce; }
     </style>
 </head>
 <body>
 <div class="container">
     <?php if ($info_message): ?>
-        <div class="alert-info"><?php echo htmlspecialchars($info_message); ?></div>
+        <div class="alert-info"><?php echo htmlspecialchars($info_message, ENT_QUOTES, 'UTF-8'); ?></div>
     <?php endif; ?>
 
     <div class="header">
@@ -109,11 +115,14 @@ $st = $status_labels[$ticket['status']] ?? ['label' => '確認中', 'color' => '
     </div>
 
     <div class="reply-box">
-        <h3 style="margin-top:0; font-size:16px;">追加のメッセージを送る</h3>
+        <h3 style="margin-top:0; font-size:16px;">このお問い合わせ（#<?php echo htmlspecialchars($ticket['id']); ?>）に追加のメッセージを送る</h3>
         <form method="post" action="">
-            <textarea name="reply_body" required placeholder="返信内容をご入力ください"></textarea>
+            <textarea name="reply_body" required placeholder="追加の返信内容をご入力ください"></textarea>
             <button type="submit" class="btn-reply">返信を送信する</button>
         </form>
+        <div class="new-ticket-note">
+            ※別の新しいお問い合わせをされる場合は、<a href="form.php">新規お問い合わせフォーム</a>よりご連絡ください。
+        </div>
     </div>
 </div>
 </body>
