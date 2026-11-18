@@ -1,9 +1,17 @@
+<?php
+session_start();
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header("Location: login.php");
+    exit;
+}
+$admin_email = $_SESSION['admin_email'] ?? '管理者';
+?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チケット - サポート管理システム</title>
+    <title>チケット - TC Plus</title>
     <!-- Google Material Icons & jQuery -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -25,7 +33,7 @@
             font-size: 13px;
         }
 
-        /* 上部ヘッダー（ChatPlus風） */
+        /* 上部ヘッダー（TC Plus風） */
         #top-header {
             height: 54px;
             background: #ffffff;
@@ -70,6 +78,12 @@
             border: 1px solid var(--primary-blue); padding: 4px 10px; border-radius: 4px;
         }
         .form-link-btn:hover { background: #ebf8ff; }
+        .logout-link {
+            color: #666; text-decoration: none; font-size: 12px;
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e0;
+        }
+        .logout-link:hover { background: #f7fafc; color: #e53e3e; border-color: #feb2b2; }
 
         /* レイアウト全体 */
         .layout-wrapper { display: flex; padding-top: 54px; min-height: 100vh; }
@@ -320,7 +334,7 @@
     <div class="header-left">
         <a href="admin.php" class="brand-logo">
             <span class="icon-box"><span class="material-icons-round">forum</span></span>
-            <span>ChatPlus Clone</span>
+            <span>TC Plus</span>
         </a>
         <ul class="top-nav">
             <li class="disabled"><a href="#" onclick="return false;">チャット</a></li>
@@ -332,7 +346,8 @@
     </div>
     <div class="header-right">
         <a href="form.php" target="_blank" class="form-link-btn">お客様用フォームを開く ↗</a>
-        <span><span class="material-icons-round" style="font-size:18px; vertical-align:middle;">account_circle</span> 管理者</span>
+        <span style="font-size:12px;"><span class="material-icons-round" style="font-size:18px; vertical-align:middle;">account_circle</span> <?php echo htmlspecialchars($admin_email, ENT_QUOTES, 'UTF-8'); ?></span>
+        <a href="logout.php" class="logout-link"><span class="material-icons-round" style="font-size:15px;">logout</span>ログアウト</a>
     </div>
 </header>
 
@@ -612,6 +627,10 @@ $(function() {
                 $container.append(html);
             });
             updateBulkBar();
+        }).fail(function(xhr) {
+            if (xhr.status === 401) {
+                window.location.href = 'login.php';
+            }
         });
     }
 

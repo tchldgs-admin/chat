@@ -1,4 +1,12 @@
 <?php
+session_start();
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header('HTTP/1.1 401 Unauthorized');
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'error' => 'ログインが必要です']);
+    exit;
+}
+
 require_once 'db.php';
 
 mb_language("Japanese");
@@ -39,7 +47,7 @@ if (!file_exists($config_file)) {
 }
 $config = array_merge($default_config, json_decode(file_get_contents($config_file), true) ?: []);
 
-// 経過時間のフォーマット関数（ChatPlus風）
+// 経過時間のフォーマット関数（TC Plus風）
 function format_elapsed($datetime_str) {
     $ts = strtotime($datetime_str);
     $now = time();
