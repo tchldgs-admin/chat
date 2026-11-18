@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <link rel="stylesheet" href="https://appimg.chatplus.jp/app/s/lib/bootstrap/3.3.7/css/bootstrap.min.css">
 <style>
-    body { background-color: #f7f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    body { background-color: #f7f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", sans-serif; }
     #login_container { width: 100%; max-width: 380px; padding: 15px; margin: auto; }
     .form-signin-heading { text-align: center; margin-bottom: 30px; font-weight: bold; color: #29a3e5; font-size: 32px; letter-spacing: -1px; }
     .form-group { margin-bottom: 20px; }
@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         <button class="btn btn-lg btn-primary btn-block" type="submit">ログイン</button>
         <ul class="links">
-            <li><a href="#">パスワードを忘れた方</a></li>
+            <li><a href="reminder.php">パスワードを忘れた方はこちら</a></li>
         </ul>
     </form>
 </div>
