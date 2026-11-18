@@ -12,8 +12,35 @@ require_once 'db.php';
 mb_language("Japanese");
 mb_internal_encoding("UTF-8");
 
-// 1. 既存のticketsテーブルに必要なカラムがなければ自動追加
+// 1. データベースの自動連番（AUTO_INCREMENT）設定とカラムの自動チェック・修復
 try {
+    // ticketsテーブルのid連番設定チェックと修復
+    $id_col = $pdo->query("SHOW COLUMNS FROM tickets WHERE Field = 'id'")->fetch();
+    if ($id_col && stripos($id_col['Extra'] ?? '', 'auto_increment') === false) {
+        $pdo->exec("SET @t_seq = 0");
+        $pdo->exec("UPDATE tickets SET id = (@t_seq := @t_seq + 1) ORDER BY created_at ASC");
+        $has_pk = !empty($pdo->query("SHOW KEYS FROM tickets WHERE Key_name = 'PRIMARY'")->fetch());
+        if ($has_pk) {
+            $pdo->exec("ALTER TABLE tickets MODIFY id INT NOT NULL AUTO_INCREMENT");
+        } else {
+            $pdo->exec("ALTER TABLE tickets MODIFY id INT NOT NULL AUTO_INCREMENT PRIMARY KEY");
+        }
+    }
+
+    // messagesテーブルのid連番設定チェックと修復
+    $msg_id_col = $pdo->query("SHOW COLUMNS FROM messages WHERE Field = 'id'")->fetch();
+    if ($msg_id_col && stripos($msg_id_col['Extra'] ?? '', 'auto_increment') === false) {
+        $pdo->exec("SET @m_seq = 0");
+        $pdo->exec("UPDATE messages SET id = (@m_seq := @m_seq + 1) ORDER BY created_at ASC");
+        $has_msg_pk = !empty($pdo->query("SHOW KEYS FROM messages WHERE Key_name = 'PRIMARY'")->fetch());
+        if ($has_msg_pk) {
+            $pdo->exec("ALTER TABLE messages MODIFY id INT NOT NULL AUTO_INCREMENT");
+        } else {
+            $pdo->exec("ALTER TABLE messages MODIFY id INT NOT NULL AUTO_INCREMENT PRIMARY KEY");
+        }
+    }
+
+    // 必要なカラムがなければ自動追加
     $columns = $pdo->query("SHOW COLUMNS FROM tickets")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('assignee', $columns)) {
         $pdo->exec("ALTER TABLE tickets ADD COLUMN assignee VARCHAR(100) DEFAULT '' AFTER subject");
@@ -28,7 +55,7 @@ try {
         $pdo->exec("ALTER TABLE tickets ADD COLUMN is_read TINYINT(1) DEFAULT 0 AFTER status");
     }
 } catch (Exception $e) {
-    // すでに存在する場合は無視
+    error_log("DB Structure Check Error: " . $e->getMessage());
 }
 
 // 2. 設定ファイル（config.json）の読み込み・初期作成

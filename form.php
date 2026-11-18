@@ -4,6 +4,35 @@ require_once 'db.php';
 mb_language("Japanese");
 mb_internal_encoding("UTF-8");
 
+// データベースの自動連番（AUTO_INCREMENT）設定のチェック・修復
+try {
+    $id_col = $pdo->query("SHOW COLUMNS FROM tickets WHERE Field = 'id'")->fetch();
+    if ($id_col && stripos($id_col['Extra'] ?? '', 'auto_increment') === false) {
+        $pdo->exec("SET @t_seq = 0");
+        $pdo->exec("UPDATE tickets SET id = (@t_seq := @t_seq + 1) ORDER BY created_at ASC");
+        $has_pk = !empty($pdo->query("SHOW KEYS FROM tickets WHERE Key_name = 'PRIMARY'")->fetch());
+        if ($has_pk) {
+            $pdo->exec("ALTER TABLE tickets MODIFY id INT NOT NULL AUTO_INCREMENT");
+        } else {
+            $pdo->exec("ALTER TABLE tickets MODIFY id INT NOT NULL AUTO_INCREMENT PRIMARY KEY");
+        }
+    }
+
+    $msg_id_col = $pdo->query("SHOW COLUMNS FROM messages WHERE Field = 'id'")->fetch();
+    if ($msg_id_col && stripos($msg_id_col['Extra'] ?? '', 'auto_increment') === false) {
+        $pdo->exec("SET @m_seq = 0");
+        $pdo->exec("UPDATE messages SET id = (@m_seq := @m_seq + 1) ORDER BY created_at ASC");
+        $has_msg_pk = !empty($pdo->query("SHOW KEYS FROM messages WHERE Key_name = 'PRIMARY'")->fetch());
+        if ($has_msg_pk) {
+            $pdo->exec("ALTER TABLE messages MODIFY id INT NOT NULL AUTO_INCREMENT");
+        } else {
+            $pdo->exec("ALTER TABLE messages MODIFY id INT NOT NULL AUTO_INCREMENT PRIMARY KEY");
+        }
+    }
+} catch (Exception $e) {
+    error_log("DB Structure Check Error: " . $e->getMessage());
+}
+
 // 設定ファイル（config.json）の読み込み
 $config_file = __DIR__ . '/config.json';
 $default_config = [
