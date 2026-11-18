@@ -1,0 +1,7 @@
+# フォルダ内のファイル一覧表示を禁止
+Options -Indexes
+
+# 設定ファイル（config.json）への外部からの直接アクセスを禁止
+<Files "config.json">
+    Require all denied
+</Files>
