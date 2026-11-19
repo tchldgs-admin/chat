@@ -83,29 +83,24 @@ if (isset($_GET['captcha_img'])) {
         $height = 54;
         $img = imagecreatetruecolor($width, $height);
 
-        // 背景色（淡いブルーグレー）
         $bg = imagecolorallocate($img, 241, 245, 249);
         imagefill($img, 0, 0, $bg);
 
-        // 干渉線（ボットのOCR読み取り防止）
         for ($i = 0; $i < 6; $i++) {
             $line_color = imagecolorallocate($img, random_int(150, 210), random_int(165, 215), random_int(180, 225));
             imageline($img, random_int(0, $width), random_int(0, $height), random_int(0, $width), random_int(0, $height), $line_color);
         }
 
-        // ノイズドット
         for ($i = 0; $i < 120; $i++) {
             $dot_color = imagecolorallocate($img, random_int(140, 200), random_int(150, 210), random_int(160, 220));
             imagesetpixel($img, random_int(0, $width - 1), random_int(0, $height - 1), $dot_color);
         }
 
-        // 1文字ずつ少し角度・高さをずらして大きく描画
         $len = strlen($code);
         for ($i = 0; $i < $len; $i++) {
             $char_tmp = imagecreatetruecolor(22, 26);
             imagefill($char_tmp, 0, 0, $bg);
             $text_color = imagecolorallocate($char_tmp, random_int(20, 60), random_int(45, 95), random_int(110, 165));
-            // 疑似太字化のため1pxずらして2回描画
             imagestring($char_tmp, 5, 6, 5, $code[$i], $text_color);
             imagestring($char_tmp, 5, 7, 5, $code[$i], $text_color);
 
@@ -115,13 +110,82 @@ if (isset($_GET['captcha_img'])) {
             imagedestroy($char_tmp);
         }
 
-        // 枠線
         $border = imagecolorallocate($img, 203, 213, 224);
         imagerectangle($img, 0, 0, $width - 1, $height - 1, $border);
 
         imagepng($img);
         imagedestroy($img);
     }
+    exit;
+}
+
+// --------------------------------------------------
+// 設定ファイル（config.json）の読み込みとサイトパラメータの厳格チェック
+// --------------------------------------------------
+$config_file = __DIR__ . '/config.json';
+$default_signature = "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
+$default_config = [
+    'from_email' => 'no-reply@cc-circle.net',
+    'from_name'  => 'サポートデスク',
+    'signature'  => $default_signature,
+    'site_name'  => 'メインサイト',
+    'sites'      => [
+        [
+            'id'         => 'default',
+            'name'       => 'メインサイト',
+            'url'        => '',
+            'from_email' => 'no-reply@cc-circle.net',
+            'from_name'  => 'サポートデスク',
+            'signature'  => $default_signature
+        ]
+    ]
+];
+$config = $default_config;
+if (file_exists($config_file)) {
+    $loaded = json_decode(file_get_contents($config_file), true);
+    if (is_array($loaded)) {
+        $config = array_merge($default_config, $loaded);
+    }
+}
+
+// ?site=〇〇 パラメータの必須チェック（未指定・無効なIDはフォームを開かせない）
+$site_param = trim($_REQUEST['site'] ?? '');
+$target_site = null;
+
+if ($site_param !== '' && !empty($config['sites']) && is_array($config['sites'])) {
+    foreach ($config['sites'] as $s) {
+        if (($s['id'] ?? '') === $site_param) {
+            $target_site = $s;
+            break;
+        }
+    }
+}
+
+if ($target_site === null) {
+    ob_end_clean();
+    http_response_code(404);
+    ?>
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ページを表示できません</title>
+        <style>
+            body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", sans-serif; background: #f8fafc; color: #4a5568; margin: 0; padding: 40px 20px; display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+            .error-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 32px 24px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+            h1 { font-size: 18px; color: #2d3748; margin: 0 0 12px; }
+            p { font-size: 14px; line-height: 1.6; margin: 0; }
+        </style>
+    </head>
+    <body>
+        <div class="error-card">
+            <h1>現在このフォームは利用できません</h1>
+            <p>指定されたURLが無効か、パラメータが不足しています。<br>正しいお問い合わせページから再度アクセスしてください。</p>
+        </div>
+    </body>
+    </html>
+    <?php
     exit;
 }
 
@@ -154,53 +218,6 @@ try {
     }
 } catch (Exception $e) {
     error_log("DB Structure Check Error: " . $e->getMessage());
-}
-
-// --------------------------------------------------
-// 設定ファイル（config.json）の読み込み
-// --------------------------------------------------
-$config_file = __DIR__ . '/config.json';
-$default_signature = "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
-$default_config = [
-    'from_email' => 'no-reply@cc-circle.net',
-    'from_name'  => 'サポートデスク',
-    'signature'  => $default_signature,
-    'site_name'  => 'メインサイト',
-    'sites'      => [
-        [
-            'id'         => 'default',
-            'name'       => 'メインサイト',
-            'url'        => '',
-            'from_email' => 'no-reply@cc-circle.net',
-            'from_name'  => 'サポートデスク',
-            'signature'  => $default_signature
-        ]
-    ]
-];
-$config = $default_config;
-if (file_exists($config_file)) {
-    $loaded = json_decode(file_get_contents($config_file), true);
-    if (is_array($loaded)) {
-        $config = array_merge($default_config, $loaded);
-    }
-}
-
-// サイトIDの特定とサイト別メール設定の取得
-$site_param = trim($_REQUEST['site'] ?? '');
-$target_site = $config['sites'][0] ?? [
-    'name'       => $config['site_name'] ?? 'メインサイト',
-    'from_email' => $config['from_email'] ?? 'no-reply@cc-circle.net',
-    'from_name'  => $config['from_name'] ?? 'サポートデスク',
-    'signature'  => $config['signature'] ?? $default_signature
-];
-
-if ($site_param !== '' && !empty($config['sites']) && is_array($config['sites'])) {
-    foreach ($config['sites'] as $s) {
-        if (($s['id'] ?? '') === $site_param) {
-            $target_site = $s;
-            break;
-        }
-    }
 }
 
 $target_site_name  = $target_site['name'] ?? 'メインサイト';
@@ -315,7 +332,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // フォーム表示用の新しい画像認証データを生成
 $captcha_data = generate_captcha_data($captcha_secret);
 $has_gd = function_exists('imagecreatetruecolor');
-$form_action = 'form.php' . ($site_param !== '' ? '?site=' . urlencode($site_param) : '');
+$form_action = 'form.php?site=' . urlencode($site_param);
 ?>
 <!DOCTYPE html>
 <html lang="ja">
