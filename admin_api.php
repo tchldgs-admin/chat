@@ -120,9 +120,12 @@ function get_site_mail_settings($config, $site_name) {
 }
 
 // --------------------------------------------------
-// 確実配信対応・共通メール送信関数
+// 共通メール送信関数（mb_send_mailベース・リトライ機能付き）
 // --------------------------------------------------
 function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
+    mb_language("Japanese");
+    mb_internal_encoding("UTF-8");
+
     $to         = trim(str_replace(["\r", "\n"], '', (string)$to));
     $from_email = trim(str_replace(["\r", "\n"], '', (string)$from_email));
     $from_name  = trim(str_replace(["\r", "\n"], ' ', (string)$from_name));
@@ -132,42 +135,18 @@ function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
         return false;
     }
 
-    $server_host = preg_replace('/^www\./i', '', $_SERVER['HTTP_HOST'] ?? 'cc-circle.net');
-    $server_host = preg_replace('/:\d+$/', '', $server_host);
-    $fallback_sender = 'no-reply@' . $server_host;
+    $encoded_name = mb_encode_mimeheader($from_name, "UTF-8", "B", "\r\n ");
+    $headers  = "From: {$encoded_name} <{$from_email}>\r\n";
+    $headers .= "Reply-To: {$from_email}";
 
-    if (!filter_var($from_email, FILTER_VALIDATE_EMAIL)) {
-        $from_email = $fallback_sender;
+    $additional_params = '';
+    if (filter_var($from_email, FILTER_VALIDATE_EMAIL)) {
+        $additional_params = "-f" . $from_email;
     }
 
-    $from_domain   = strtolower(substr(strrchr($from_email, '@'), 1));
-    $server_domain = strtolower($server_host);
-
-    $actual_from_email = $from_email;
-    $reply_to_email    = $from_email;
-
-    if ($from_domain !== $server_domain && substr($from_domain, -strlen('.' . $server_domain)) !== '.' . $server_domain) {
-        $actual_from_email = $fallback_sender;
-        $reply_to_email    = $from_email;
-    }
-
-    $encoded_name    = '=?UTF-8?B?' . base64_encode($from_name) . '?=';
-    $encoded_subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
-
-    $normalized_body = str_replace(["\r\n", "\r"], "\n", (string)$body);
-    $encoded_body    = chunk_split(base64_encode($normalized_body));
-
-    $headers  = "From: {$encoded_name} <{$actual_from_email}>\n";
-    $headers .= "Reply-To: {$reply_to_email}\n";
-    $headers .= "MIME-Version: 1.0\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\n";
-    $headers .= "Content-Transfer-Encoding: base64";
-
-    $additional_params = "-f" . $actual_from_email;
-
-    $result = mail($to, $encoded_subject, $encoded_body, $headers, $additional_params);
-    if (!$result) {
-        error_log("Mail Send Failed: to={$to}, from={$actual_from_email}");
+    $result = mb_send_mail($to, $subject, $body, $headers, $additional_params);
+    if (!$result && $additional_params !== '') {
+        $result = mb_send_mail($to, $subject, $body, $headers);
     }
     return $result;
 }
