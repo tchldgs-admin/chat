@@ -326,7 +326,7 @@ try {
     }
 
     // --------------------------------------------------
-    // 3. 返信送信・社内メモ追加・ステータス更新（サイト別のメール設定を使用）
+    // 3. 返信送信・社内メモ追加・ステータス更新
     // --------------------------------------------------
     if ($action === 'reply') {
         $ticket_id  = (int)($_POST['ticket_id'] ?? 0);
@@ -417,7 +417,7 @@ try {
     }
 
     // --------------------------------------------------
-    // 5. 「+ チケットを追加」からの新規作成（サイト別のメール設定を使用）
+    // 5. 「+ チケットを追加」からの新規作成
     // --------------------------------------------------
     if ($action === 'create_ticket') {
         $name      = trim($_POST['customer_name'] ?? '');
@@ -468,9 +468,19 @@ try {
     }
 
     // --------------------------------------------------
-    // 6. 「⚙ チケット設定」の保存（担当者・カテゴリのみ更新）
+    // 6. 「⚙ チケット設定」の保存（管理者権限のみ許可）
     // --------------------------------------------------
     if ($action === 'save_settings') {
+        $stmt_me = $pdo->prepare("SELECT role FROM admins WHERE email = ?");
+        $stmt_me->execute([$_SESSION['admin_email'] ?? '']);
+        $me = $stmt_me->fetch();
+        $my_role = $me['role'] ?? ($_SESSION['admin_role'] ?? 'admin');
+
+        if ($my_role !== 'admin') {
+            header('HTTP/1.1 403 Forbidden');
+            throw new Exception('この操作を行う権限がありません。');
+        }
+
         $config['agents']     = array_values(array_filter(array_map('trim', explode("\n", $_POST['agents'] ?? ''))));
         $config['categories'] = array_values(array_filter(array_map('trim', explode("\n", $_POST['categories'] ?? ''))));
 

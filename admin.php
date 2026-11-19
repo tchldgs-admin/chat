@@ -278,10 +278,12 @@ $is_admin   = ($admin_role === 'admin');
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 <span>チケットを追加</span>
             </button>
+            <?php if ($is_admin): ?>
             <button type="button" class="btn-navy" id="btn-open-settings">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
                 <span>チケット設定</span>
             </button>
+            <?php endif; ?>
         </div>
         
         <?php if ($is_admin): ?>
@@ -448,7 +450,8 @@ $is_admin   = ($admin_role === 'admin');
     </div>
 </div>
 
-<!-- モーダル2：⚙ チケット設定（担当者・カテゴリ管理） -->
+<?php if ($is_admin): ?>
+<!-- モーダル2：⚙ チケット設定（管理者のみ表示） -->
 <div class="modal-overlay" id="modal-settings">
     <div class="modal-dialog">
         <div class="modal-header">
@@ -480,6 +483,7 @@ $is_admin   = ($admin_role === 'admin');
         </form>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -948,23 +952,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    document.getElementById('btn-open-settings').addEventListener('click', function() {
-        document.getElementById('set-agents').value = (appConfig.agents || []).join("\n");
-        document.getElementById('set-categories').value = (appConfig.categories || []).join("\n");
-        document.getElementById('modal-settings').classList.add('open');
-    });
-    document.getElementById('form-settings').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const fd = new FormData(this);
-        const obj = { action: 'save_settings' };
-        fd.forEach((v, k) => obj[k] = v);
-        const res = await apiPost(obj);
-        if (res.success) {
-            document.getElementById('modal-settings').classList.remove('open');
-            alert('設定を保存しました。');
-            loadTickets();
-        }
-    });
+    const btnOpenSettings = document.getElementById('btn-open-settings');
+    if (btnOpenSettings) {
+        btnOpenSettings.addEventListener('click', function() {
+            document.getElementById('set-agents').value = (appConfig.agents || []).join("\n");
+            document.getElementById('set-categories').value = (appConfig.categories || []).join("\n");
+            document.getElementById('modal-settings').classList.add('open');
+        });
+    }
+
+    const formSettings = document.getElementById('form-settings');
+    if (formSettings) {
+        formSettings.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            const obj = { action: 'save_settings' };
+            fd.forEach((v, k) => obj[k] = v);
+            const res = await apiPost(obj);
+            if (res.success) {
+                document.getElementById('modal-settings').classList.remove('open');
+                alert('設定を保存しました。');
+                loadTickets();
+            } else {
+                alert(res.error || 'エラーが発生しました');
+            }
+        });
+    }
 
     loadTickets();
 });
