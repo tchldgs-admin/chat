@@ -7,7 +7,20 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
+require_once 'db.php';
 header('Content-Type: application/json; charset=utf-8');
+
+// 最新の自分の権限を確認（一般権限はアクセス不可）
+$stmt_me = $pdo->prepare("SELECT role FROM admins WHERE email = ?");
+$stmt_me->execute([$_SESSION['admin_email'] ?? '']);
+$me = $stmt_me->fetch();
+$my_role = $me['role'] ?? ($_SESSION['admin_role'] ?? 'admin');
+
+if ($my_role !== 'admin') {
+    header('HTTP/1.1 403 Forbidden');
+    echo json_encode(['success' => false, 'error' => 'この操作を行う権限がありません。']);
+    exit;
+}
 
 $config_file = __DIR__ . '/config.json';
 $default_signature = "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
@@ -36,7 +49,6 @@ if (!file_exists($config_file)) {
 $loaded = json_decode(file_get_contents($config_file), true);
 $config = array_merge($default_config, is_array($loaded) ? $loaded : []);
 
-// 既存のconfig.jsonにsitesがない場合は初期サイトを自動生成
 if (empty($config['sites']) || !is_array($config['sites'])) {
     $initial_name = !empty($config['site_name']) ? $config['site_name'] : 'メインサイト';
     $config['sites'] = [
@@ -51,7 +63,6 @@ if (empty($config['sites']) || !is_array($config['sites'])) {
     ];
 }
 
-// 各サイトにメール関連項目が未設定の場合は補完する
 $needs_save = false;
 foreach ($config['sites'] as &$s) {
     if (!isset($s['from_email'])) {
@@ -100,7 +111,6 @@ try {
         }
 
         if ($id === '') {
-            // 新規追加
             $new_id = 's_' . bin2hex(random_bytes(4));
             $config['sites'][] = [
                 'id'         => $new_id,
@@ -111,7 +121,6 @@ try {
                 'signature'  => $signature
             ];
         } else {
-            // 既存サイトの編集
             $found = false;
             foreach ($config['sites'] as &$s) {
                 if ($s['id'] === $id) {

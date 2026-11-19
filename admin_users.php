@@ -10,7 +10,26 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=login.php"></head><body><script>window.location.replace("login.php");</script></body></html>';
     exit;
 }
-$admin_email = $_SESSION['admin_email'] ?? '管理者';
+
+require_once 'db.php';
+
+// DBから最新の表示名と権限を取得してセッションに同期
+$stmt_me = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
+$stmt_me->execute([$_SESSION['admin_email'] ?? '']);
+$me = $stmt_me->fetch();
+if ($me) {
+    $_SESSION['admin_name'] = !empty($me['name']) ? $me['name'] : explode('@', $me['email'])[0];
+    $_SESSION['admin_role'] = !empty($me['role']) ? $me['role'] : 'admin';
+}
+
+$admin_name = $_SESSION['admin_name'] ?? '管理者';
+$admin_role = $_SESSION['admin_role'] ?? 'admin';
+
+// 「一般」権限の場合はチケット画面へリダイレクト
+if ($admin_role !== 'admin') {
+    header("Location: admin.php");
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -18,7 +37,6 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>設定 | 担当者管理 - TC Plus</title>
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <style>
         :root {
             --primary-blue: #29a3e5;
@@ -31,7 +49,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
             --bg-light: #f7fafc;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: "Helvetica Neue", Arial, sans-serif; color: var(--text-main); font-size: 13px; background: #fff; }
+        body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; color: var(--text-main); font-size: 13px; background: #fff; }
         svg { vertical-align: middle; flex-shrink: 0; }
 
         /* ヘッダー周り */
@@ -76,9 +94,10 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         .user-info { display: flex; align-items: center; gap: 16px; }
         .user-icon { width: 42px; height: 42px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #718096; }
         .user-details { display: flex; flex-direction: column; gap: 4px; }
-        .user-name { font-size: 15px; font-weight: bold; color: #2d3748; }
+        .user-name { font-size: 15px; font-weight: bold; color: #2d3748; display: flex; align-items: center; gap: 8px; }
         .user-email { font-size: 12px; color: #718096; display: flex; align-items: center; gap: 4px; }
-        .badge-admin { background: #e53e3e; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: normal; vertical-align: middle;}
+        .badge-admin { background: #e53e3e; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: bold; }
+        .badge-general { background: #718096; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: bold; }
         
         .user-actions { display: flex; gap: 8px; }
         .btn-action { background: #f7fafc; border: 1px solid #e2e8f0; color: #4a5568; width: 34px; height: 34px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;}
@@ -98,9 +117,9 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 13px; color: #4a5568; }
-        .form-control { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 14px; transition: border-color 0.2s; }
+        .form-control { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 14px; background: #fff; transition: border-color 0.2s; }
         .form-control:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 2px rgba(41, 163, 229, 0.2); }
-        .form-note { font-size: 11px; color: #718096; margin-top: 4px; }
+        .form-note { font-size: 11px; color: #718096; margin-top: 4px; line-height: 1.5; }
         .btn-cancel { background: #fff; border: 1px solid #cbd5e0; color: #4a5568; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; }
         .btn-cancel:hover { background: #f7fafc; }
     </style>
@@ -124,9 +143,9 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         </ul>
     </div>
     <div class="header-right">
-        <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
-            <?php echo htmlspecialchars($admin_email, ENT_QUOTES, 'UTF-8'); ?>
+        <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px; font-weight:bold; color:#333;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#718096"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+            <span id="header-admin-name"><?php echo htmlspecialchars($admin_name, ENT_QUOTES, 'UTF-8'); ?></span>
         </span>
         <a href="logout.php" class="logout-link">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
@@ -193,8 +212,22 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
                 <input type="hidden" name="id" id="user-id" value="">
                 
                 <div class="form-group">
+                    <label>担当者名（表示名）<span style="color:#e53e3e;">*</span></label>
+                    <input type="text" name="name" id="user-name" class="form-control" required placeholder="例: 山田 太郎">
+                    <div class="form-note">※画面右上のアカウント表示や担当者一覧に表示される名前です。</div>
+                </div>
+
+                <div class="form-group">
                     <label>メールアドレス（ログインID）<span style="color:#e53e3e;">*</span></label>
                     <input type="email" name="email" id="user-email" class="form-control" required placeholder="例: yamada@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label>権限<span style="color:#e53e3e;">*</span></label>
+                    <select name="role" id="user-role" class="form-control">
+                        <option value="admin">管理者（すべての機能・設定メニューが利用可能）</option>
+                        <option value="general">一般（チケット管理のみ利用可能・設定メニューは非表示）</option>
+                    </select>
                 </div>
                 
                 <div class="form-group">
@@ -212,29 +245,48 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
 </div>
 
 <script>
-$(function() {
+document.addEventListener('DOMContentLoaded', function() {
+    let usersData = [];
+
     function esc(str) {
         if (str === null || str === undefined) return '';
-        return String(str).replace(/[&<>"']/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; });
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+        });
     }
 
-    function loadUsers() {
-        $.getJSON('admin_users_api.php', { action: 'list' }, function(res) {
-            if (!res.success) {
-                alert('エラー: ' + res.error);
+    async function loadUsers() {
+        try {
+            const res = await fetch('admin_users_api.php?action=list', { cache: 'no-store' });
+            if (res.status === 401) {
+                window.location.replace('login.php');
                 return;
             }
-            
-            const $container = $('#user-list-container').empty();
-            res.users.forEach(function(u) {
-                const html = `
+            if (res.status === 403) {
+                window.location.replace('admin.php');
+                return;
+            }
+            const data = await res.json();
+            if (!data.success) {
+                alert('エラー: ' + data.error);
+                return;
+            }
+
+            usersData = data.users || [];
+            const container = document.getElementById('user-list-container');
+            container.innerHTML = usersData.map(u => {
+                const roleBadge = (u.role === 'general')
+                    ? '<span class="badge-general">一般</span>'
+                    : '<span class="badge-admin">管理者</span>';
+
+                return `
                 <div class="user-item">
                     <div class="user-info">
                         <div class="user-icon">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                         </div>
                         <div class="user-details">
-                            <div class="user-name">${esc(u.email.split('@')[0])} <span class="badge-admin">管理者</span></div>
+                            <div class="user-name">${esc(u.name)} ${roleBadge}</div>
                             <div class="user-email">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
                                 ${esc(u.email)}
@@ -242,7 +294,7 @@ $(function() {
                         </div>
                     </div>
                     <div class="user-actions">
-                        <button type="button" class="btn-action btn-edit" title="編集" data-id="${u.id}" data-email="${esc(u.email)}">
+                        <button type="button" class="btn-action btn-edit" title="編集" data-id="${u.id}">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                         </button>
                         <button type="button" class="btn-action btn-delete" title="削除" data-id="${u.id}">
@@ -250,65 +302,80 @@ $(function() {
                         </button>
                     </div>
                 </div>`;
-                $container.append(html);
-            });
-        }).fail(function(xhr) {
-            if (xhr.status === 401) {
-                window.location.href = 'login.php';
-            }
-        });
+            }).join('');
+        } catch (err) {
+            console.error(err);
+        }
     }
 
-    $('#btn-add-user').on('click', function() {
-        $('#form-user')[0].reset();
-        $('#user-id').val('');
-        $('#modal-title').text('担当者を追加');
-        $('#user-password').prop('required', true);
-        $('#pass-req-mark').show();
-        $('#pass-note').text('');
-        $('#modal-user').addClass('open');
+    // 新規追加ボタン
+    document.getElementById('btn-add-user').addEventListener('click', function() {
+        document.getElementById('form-user').reset();
+        document.getElementById('user-id').value = '';
+        document.getElementById('user-role').value = 'admin';
+        document.getElementById('modal-title').textContent = '担当者を追加';
+        document.getElementById('user-password').required = true;
+        document.getElementById('pass-req-mark').style.display = 'inline';
+        document.getElementById('pass-note').textContent = '';
+        document.getElementById('modal-user').classList.add('open');
     });
 
-    $(document).on('click', '.btn-edit', function() {
-        $('#form-user')[0].reset();
-        $('#user-id').val($(this).data('id'));
-        $('#user-email').val($(this).data('email'));
-        $('#modal-title').text('担当者を編集');
-        $('#user-password').prop('required', false);
-        $('#pass-req-mark').hide();
-        $('#pass-note').text('※変更する場合のみ入力してください。空欄の場合は現在のパスワードが維持されます。');
-        $('#modal-user').addClass('open');
-    });
+    // クリックイベント（編集・削除・モーダル閉じる）
+    document.addEventListener('click', async function(e) {
+        const editBtn = e.target.closest('.btn-edit');
+        if (editBtn) {
+            const targetId = String(editBtn.dataset.id);
+            const user = usersData.find(u => String(u.id) === targetId);
+            if (!user) return;
 
-    $(document).on('click', '.btn-delete', function() {
-        if (!confirm('この担当者を削除してもよろしいですか？\n※この操作は取り消せません。')) return;
-        
-        $.post('admin_users_api.php', { action: 'delete', id: $(this).data('id') }, function(res) {
-            if (res.success) {
+            document.getElementById('form-user').reset();
+            document.getElementById('user-id').value = user.id;
+            document.getElementById('user-name').value = user.name || '';
+            document.getElementById('user-email').value = user.email || '';
+            document.getElementById('user-role').value = user.role || 'admin';
+            document.getElementById('modal-title').textContent = '担当者を編集';
+            document.getElementById('user-password').required = false;
+            document.getElementById('pass-req-mark').style.display = 'none';
+            document.getElementById('pass-note').textContent = '※変更する場合のみ入力してください。空欄の場合は現在のパスワードが維持されます。';
+            document.getElementById('modal-user').classList.add('open');
+            return;
+        }
+
+        const delBtn = e.target.closest('.btn-delete');
+        if (delBtn) {
+            if (!confirm('この担当者を削除してもよろしいですか？\n※この操作は取り消せません。')) return;
+            const fd = new FormData();
+            fd.append('action', 'delete');
+            fd.append('id', delBtn.dataset.id);
+            const res = await fetch('admin_users_api.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.success) {
                 loadUsers();
             } else {
-                alert(res.error);
+                alert(data.error);
             }
-        }, 'json');
+            return;
+        }
+
+        const closeBtn = e.target.closest('.modal-close');
+        if (closeBtn) {
+            closeBtn.closest('.modal-overlay').classList.remove('open');
+        }
     });
 
-    $('#form-user').on('submit', function(e) {
+    // フォーム送信
+    document.getElementById('form-user').addEventListener('submit', async function(e) {
         e.preventDefault();
-        const data = $(this).serializeArray();
-        data.push({name: 'action', value: 'save'});
-        
-        $.post('admin_users_api.php', data, function(res) {
-            if (res.success) {
-                $('#modal-user').removeClass('open');
-                loadUsers();
-            } else {
-                alert(res.error);
-            }
-        }, 'json');
-    });
-
-    $('.modal-close').on('click', function() {
-        $(this).closest('.modal-overlay').removeClass('open');
+        const fd = new FormData(this);
+        fd.append('action', 'save');
+        const res = await fetch('admin_users_api.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            // 自分の名前が変わった場合に備えてページをリロードしヘッダー表示も最新化
+            window.location.reload();
+        } else {
+            alert(data.error || '保存に失敗しました');
+        }
     });
 
     loadUsers();

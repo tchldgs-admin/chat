@@ -2,6 +2,20 @@
 session_start();
 require_once 'db.php';
 
+// adminsテーブルにname（担当者名）とrole（権限）カラムがなければ自動追加
+try {
+    $cols = $pdo->query("SHOW COLUMNS FROM admins")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('name', $cols)) {
+        $pdo->exec("ALTER TABLE admins ADD COLUMN name VARCHAR(100) NOT NULL DEFAULT '' AFTER id");
+        $pdo->exec("UPDATE admins SET name = SUBSTRING_INDEX(email, '@', 1) WHERE name = ''");
+    }
+    if (!in_array('role', $cols)) {
+        $pdo->exec("ALTER TABLE admins ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin' AFTER password_hash");
+    }
+} catch (Exception $e) {
+    error_log("Admins Table Migration Error: " . $e->getMessage());
+}
+
 // すでにログインしている場合は管理画面へリダイレクト
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
     if (!headers_sent()) {
@@ -21,17 +35,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($email === '' || $password === '') {
         $error_message = 'メールアドレスとパスワードを入力してください。';
     } else {
-        // データベースからメールアドレスで管理者を検索
         $stmt = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
         $stmt->execute([$email]);
         $admin = $stmt->fetch();
 
-        // パスワードの照合
         if ($admin && password_verify($password, $admin['password_hash'])) {
-            // セッションIDを再生成（セキュリティ対策）
             session_regenerate_id(true);
+            $display_name = !empty($admin['name']) ? $admin['name'] : explode('@', $admin['email'])[0];
+            $role = !empty($admin['role']) ? $admin['role'] : 'admin';
+
             $_SESSION['admin_logged_in'] = true;
-            $_SESSION['admin_email'] = $admin['email'];
+            $_SESSION['admin_id']        = $admin['id'];
+            $_SESSION['admin_email']     = $admin['email'];
+            $_SESSION['admin_name']      = $display_name;
+            $_SESSION['admin_role']      = $role;
             
             if (!headers_sent()) {
                 header("Location: admin.php");

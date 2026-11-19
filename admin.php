@@ -10,7 +10,34 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=login.php"></head><body><script>window.location.replace("login.php");</script></body></html>';
     exit;
 }
-$admin_email = $_SESSION['admin_email'] ?? '管理者';
+
+require_once 'db.php';
+
+// adminsテーブルにname・roleカラムがなければ自動追加し、現在のユーザー情報を最新化
+try {
+    $cols = $pdo->query("SHOW COLUMNS FROM admins")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('name', $cols)) {
+        $pdo->exec("ALTER TABLE admins ADD COLUMN name VARCHAR(100) NOT NULL DEFAULT '' AFTER id");
+        $pdo->exec("UPDATE admins SET name = SUBSTRING_INDEX(email, '@', 1) WHERE name = ''");
+    }
+    if (!in_array('role', $cols)) {
+        $pdo->exec("ALTER TABLE admins ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin' AFTER password_hash");
+    }
+
+    $stmt_me = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
+    $stmt_me->execute([$_SESSION['admin_email'] ?? '']);
+    $me = $stmt_me->fetch();
+    if ($me) {
+        $_SESSION['admin_name'] = !empty($me['name']) ? $me['name'] : explode('@', $me['email'])[0];
+        $_SESSION['admin_role'] = !empty($me['role']) ? $me['role'] : 'admin';
+    }
+} catch (Exception $e) {
+    error_log("Admin Sync Error: " . $e->getMessage());
+}
+
+$admin_name = $_SESSION['admin_name'] ?? '管理者';
+$admin_role = $_SESSION['admin_role'] ?? 'admin';
+$is_admin   = ($admin_role === 'admin');
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -189,10 +216,12 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         </ul>
     </div>
     <div class="header-right">
-        <a href="admin_sites.php" class="form-link-btn">フォーム埋め込み・サイト管理 ↗</a>
-        <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
-            <?php echo htmlspecialchars($admin_email, ENT_QUOTES, 'UTF-8'); ?>
+        <?php if ($is_admin): ?>
+            <a href="admin_sites.php" class="form-link-btn">フォーム埋め込み・サイト管理 ↗</a>
+        <?php endif; ?>
+        <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px; font-weight:bold; color:#333;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#718096"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+            <?php echo htmlspecialchars($admin_name, ENT_QUOTES, 'UTF-8'); ?>
         </span>
         <a href="logout.php" class="logout-link">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
@@ -255,6 +284,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
             </button>
         </div>
         
+        <?php if ($is_admin): ?>
         <div class="side-group-title">設定</div>
         <ul class="side-menu">
             <li>
@@ -270,6 +300,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
                 </a>
             </li>
         </ul>
+        <?php endif; ?>
     </aside>
 
     <!-- メインエリア -->

@@ -10,7 +10,26 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=login.php"></head><body><script>window.location.replace("login.php");</script></body></html>';
     exit;
 }
-$admin_email = $_SESSION['admin_email'] ?? '管理者';
+
+require_once 'db.php';
+
+// DBから最新の表示名と権限を取得してセッションに同期
+$stmt_me = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
+$stmt_me->execute([$_SESSION['admin_email'] ?? '']);
+$me = $stmt_me->fetch();
+if ($me) {
+    $_SESSION['admin_name'] = !empty($me['name']) ? $me['name'] : explode('@', $me['email'])[0];
+    $_SESSION['admin_role'] = !empty($me['role']) ? $me['role'] : 'admin';
+}
+
+$admin_name = $_SESSION['admin_name'] ?? '管理者';
+$admin_role = $_SESSION['admin_role'] ?? 'admin';
+
+// 「一般」権限の場合はチケット画面へリダイレクト
+if ($admin_role !== 'admin') {
+    header("Location: admin.php");
+    exit;
+}
 
 // 現在の設置URLベースを自動取得
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
@@ -147,9 +166,9 @@ $base_url = $protocol . $domain . $dir;
         </ul>
     </div>
     <div class="header-right">
-        <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
-            <?php echo htmlspecialchars($admin_email, ENT_QUOTES, 'UTF-8'); ?>
+        <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px; font-weight:bold; color:#333;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#718096"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+            <?php echo htmlspecialchars($admin_name, ENT_QUOTES, 'UTF-8'); ?>
         </span>
         <a href="logout.php" class="logout-link">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
@@ -270,6 +289,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.replace('login.php');
                 return;
             }
+            if (res.status === 403) {
+                window.location.replace('admin.php');
+                return;
+            }
             const data = await res.json();
             if (!data.success) {
                 alert('エラー: ' + data.error);
@@ -338,7 +361,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 新規サイト追加ボタン
     document.getElementById('btn-add-site').addEventListener('click', function() {
         document.getElementById('form-site').reset();
         document.getElementById('site-id').value = '';
@@ -350,7 +372,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('modal-site').classList.add('open');
     });
 
-    // クリックイベント（編集・削除・コピー・モーダル閉じる）
     document.addEventListener('click', async function(e) {
         const editBtn = e.target.closest('.btn-edit');
         if (editBtn) {
@@ -418,7 +439,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 保存送信
     document.getElementById('form-site').addEventListener('submit', async function(e) {
         e.preventDefault();
         const fd = new FormData(this);
