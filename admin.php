@@ -417,7 +417,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
     </div>
 </div>
 
-<!-- モーダル2：⚙ チケット設定 -->
+<!-- モーダル2：⚙ チケット設定（担当者・カテゴリ管理） -->
 <div class="modal-overlay" id="modal-settings">
     <div class="modal-dialog">
         <div class="modal-header">
@@ -428,27 +428,18 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         </div>
         <form id="form-settings">
             <div class="modal-body">
-                <div class="m-group">
-                    <label>差出人メールアドレス（From）</label>
-                    <input type="email" name="from_email" id="set-from-email" class="form-control" required>
-                </div>
-                <div class="m-group">
-                    <label>差出人名</label>
-                    <input type="text" name="from_name" id="set-from-name" class="form-control" required>
-                </div>
-                <div class="m-group">
-                    <label>メール署名（返信メールの末尾に自動挿入されます）</label>
-                    <textarea name="signature" id="set-signature" class="form-control" style="height:90px;"></textarea>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                     <div class="m-group">
                         <label>担当者リスト（1行に1名）</label>
-                        <textarea name="agents" id="set-agents" class="form-control" style="height:90px;"></textarea>
+                        <textarea name="agents" id="set-agents" class="form-control" style="height:160px;"></textarea>
                     </div>
                     <div class="m-group">
                         <label>カテゴリリスト（1行に1項目）</label>
-                        <textarea name="categories" id="set-categories" class="form-control" style="height:90px;"></textarea>
+                        <textarea name="categories" id="set-categories" class="form-control" style="height:160px;"></textarea>
                     </div>
+                </div>
+                <div style="font-size:11px; color:#718096; margin-top:4px;">
+                    ※差出人メールアドレス・差出人名・メール署名は左メニューの「サイト管理」からサイトごとに設定できます。
                 </div>
             </div>
             <div class="modal-footer">
@@ -512,7 +503,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return await res.json();
     }
 
-    // チケット一覧の読み込み
     async function loadTickets() {
         const form = document.getElementById('search-form');
         const fd = new FormData(form);
@@ -622,7 +612,6 @@ document.addEventListener('DOMContentLoaded', function() {
             cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
     }
 
-    // チケット詳細の展開（スレッド読み込み）
     async function loadTicketDetail(ticketId) {
         const panel = document.getElementById(`detail-panel-${ticketId}`);
         if (!panel) return;
@@ -716,7 +705,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // クリックイベントの一元管理
     document.addEventListener('click', async function(e) {
         const row = e.target.closest('.ticket-row');
         if (row && !e.target.closest('.no-expand')) {
@@ -930,9 +918,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.getElementById('btn-open-settings').addEventListener('click', function() {
-        document.getElementById('set-from-email').value = appConfig.from_email || '';
-        document.getElementById('set-from-name').value = appConfig.from_name || '';
-        document.getElementById('set-signature').value = appConfig.signature || '';
         document.getElementById('set-agents').value = (appConfig.agents || []).join("\n");
         document.getElementById('set-categories').value = (appConfig.categories || []).join("\n");
         document.getElementById('modal-settings').classList.add('open');

@@ -35,13 +35,21 @@ try {
 
 // 設定ファイル（config.json）の読み込み
 $config_file = __DIR__ . '/config.json';
+$default_signature = "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
 $default_config = [
     'from_email' => 'no-reply@cc-circle.net',
     'from_name'  => 'サポートデスク',
-    'signature'  => "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------",
+    'signature'  => $default_signature,
     'site_name'  => 'メインサイト',
     'sites'      => [
-        ['id' => 'default', 'name' => 'メインサイト', 'url' => '']
+        [
+            'id'         => 'default',
+            'name'       => 'メインサイト',
+            'url'        => '',
+            'from_email' => 'no-reply@cc-circle.net',
+            'from_name'  => 'サポートデスク',
+            'signature'  => $default_signature
+        ]
     ]
 ];
 $config = $default_config;
@@ -52,19 +60,30 @@ if (file_exists($config_file)) {
     }
 }
 
-// サイトIDの特定（GETまたはPOSTのsiteパラメータから該当サイト名を取得）
+// サイトIDの特定とサイト別メール設定の取得
 $site_param = trim($_REQUEST['site'] ?? '');
-$target_site_name = $config['sites'][0]['name'] ?? ($config['site_name'] ?? 'メインサイト');
+$target_site = $config['sites'][0] ?? [
+    'name'       => $config['site_name'] ?? 'メインサイト',
+    'from_email' => $config['from_email'] ?? 'no-reply@cc-circle.net',
+    'from_name'  => $config['from_name'] ?? 'サポートデスク',
+    'signature'  => $config['signature'] ?? $default_signature
+];
+
 if ($site_param !== '' && !empty($config['sites']) && is_array($config['sites'])) {
     foreach ($config['sites'] as $s) {
         if (($s['id'] ?? '') === $site_param) {
-            $target_site_name = $s['name'];
+            $target_site = $s;
             break;
         }
     }
 }
 
-// 共通メール送信関数（差出人名・-fオプション対応）
+$target_site_name  = $target_site['name'] ?? 'メインサイト';
+$target_from_email = !empty($target_site['from_email']) ? $target_site['from_email'] : ($config['from_email'] ?? 'no-reply@cc-circle.net');
+$target_from_name  = !empty($target_site['from_name'])  ? $target_site['from_name']  : ($config['from_name'] ?? 'サポートデスク');
+$target_signature  = isset($target_site['signature'])     ? $target_site['signature']  : ($config['signature'] ?? $default_signature);
+
+// 共通メール送信関数
 function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
     $encoded_name = mb_encode_mimeheader($from_name, "UTF-8", "B", "\n");
     $headers  = "From: {$encoded_name} <{$from_email}>\r\n";
@@ -99,10 +118,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
 
-            // お客様専用の合言葉（ランダムな32文字の英数字）を生成
             $secret_key = bin2hex(random_bytes(16));
 
-            // 1. ticketsテーブルに新規レコードを挿入（特定したサイト名を保存）
             $columns = $pdo->query("SHOW COLUMNS FROM tickets")->fetchAll(PDO::FETCH_COLUMN);
             if (in_array('site_name', $columns)) {
                 $stmt = $pdo->prepare("INSERT INTO tickets (secret_key, customer_name, customer_email, subject, site_name, status, is_read) VALUES (?, ?, ?, ?, ?, 11, 0)");
@@ -113,22 +130,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $ticket_id = $pdo->lastInsertId();
 
-            // 2. messagesテーブルに1通目の内容を保存
             $stmt_msg = $pdo->prepare("INSERT INTO messages (ticket_id, sender_type, body) VALUES (?, 'customer', ?)");
             $stmt_msg->execute([$ticket_id, $body]);
 
             $pdo->commit();
 
-            // お客様専用の確認・返信URLを組み立てる
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
             $domain = $_SERVER['HTTP_HOST'];
             $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
             $ticket_url = $protocol . $domain . $dir . "/view.php?id=" . $ticket_id . "&key=" . $secret_key;
-
-            // 3. お客様へ受付完了メールを送信（設定画面の差出人名・メール・署名を反映）
-            $from_email = $config['from_email'];
-            $from_name  = $config['from_name'];
-            $signature  = $config['signature'];
 
             $mail_subject = "【受付完了】お問い合わせありがとうございます（チケットID: #{$ticket_id}）";
             $mail_body = "{$name} 様\n\n"
@@ -140,9 +150,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        . "件名：{$subject}\n"
                        . "内容：\n{$body}\n"
                        . "--------------------------------------------------\n\n"
-                       . $signature;
+                       . $target_signature;
 
-            send_tc_mail($email, $mail_subject, $mail_body, $from_email, $from_name);
+            send_tc_mail($email, $mail_subject, $mail_body, $target_from_email, $target_from_name);
 
             $is_submitted = true;
 

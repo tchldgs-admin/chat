@@ -12,7 +12,7 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 $admin_email = $_SESSION['admin_email'] ?? '管理者';
 
-// 現在の設置URLベース（例: https://cc-circle.net/chat）を自動取得
+// 現在の設置URLベースを自動取得
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
 $domain = $_SERVER['HTTP_HOST'] ?? 'cc-circle.net';
 $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
@@ -86,6 +86,7 @@ $base_url = $protocol . $domain . $dir;
         .site-meta a { color: #2b6cb0; text-decoration: none; }
         .site-meta a:hover { text-decoration: underline; }
         .site-id-badge { background: #edf2f7; color: #4a5568; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+        .mail-setting-badge { background: #f0fff4; border: 1px solid #c6f6d5; color: #276749; padding: 2px 8px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
 
         .site-actions { display: flex; gap: 8px; }
         .btn-action { background: #f7fafc; border: 1px solid #e2e8f0; color: #4a5568; height: 34px; padding: 0 10px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: bold; text-decoration: none; transition: all 0.2s; }
@@ -110,16 +111,17 @@ $base_url = $protocol . $domain . $dir;
         /* モーダル */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
         .modal-overlay.open { display: flex; }
-        .modal-dialog { background: #fff; width: 480px; max-width: 90vw; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
+        .modal-dialog { background: #fff; width: 540px; max-width: 94vw; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
         .modal-header { padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 16px; color: #2d3748; }
         .modal-close { cursor: pointer; color: #a0aec0; display: inline-flex; }
         .modal-close:hover { color: #4a5568; }
-        .modal-body { padding: 20px; }
+        .modal-body { padding: 20px; max-height: 75vh; overflow-y: auto; }
         .modal-footer { padding: 16px 20px; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
         
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 13px; color: #4a5568; }
-        .form-control { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 14px; transition: border-color 0.2s; }
+        .section-divider { font-size: 12px; font-weight: bold; color: #2b6cb0; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin: 18px 0 12px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #4a5568; }
+        .form-control { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px; font-family: inherit; transition: border-color 0.2s; }
         .form-control:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 2px rgba(41, 163, 229, 0.2); }
         .form-note { font-size: 11px; color: #718096; margin-top: 4px; }
         .btn-cancel { background: #fff; border: 1px solid #cbd5e0; color: #4a5568; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; }
@@ -222,7 +224,23 @@ $base_url = $protocol . $domain . $dir;
                 <div class="form-group">
                     <label>設置先サイトURL（任意・メモ用）</label>
                     <input type="url" name="url" id="site-url" class="form-control" placeholder="例: https://example.com/contact">
-                    <div class="form-note">※フォームを埋め込むページのURLをメモとして登録できます。</div>
+                </div>
+
+                <div class="section-divider">このサイト専用のメール送信設定</div>
+
+                <div class="form-group">
+                    <label>差出人メールアドレス（From）<span style="color:#e53e3e;">*</span></label>
+                    <input type="email" name="from_email" id="site-from-email" class="form-control" required placeholder="例: no-reply@cc-circle.net">
+                </div>
+
+                <div class="form-group">
+                    <label>差出人名<span style="color:#e53e3e;">*</span></label>
+                    <input type="text" name="from_name" id="site-from-name" class="form-control" required placeholder="例: サポートデスク">
+                </div>
+
+                <div class="form-group">
+                    <label>メール署名（返信メールの末尾に自動挿入されます）</label>
+                    <textarea name="signature" id="site-signature" class="form-control" style="height: 100px; resize: vertical;"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -236,6 +254,7 @@ $base_url = $protocol . $domain . $dir;
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const baseUrl = <?php echo json_encode($base_url, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+    let sitesData = [];
 
     function esc(str) {
         if (str === null || str === undefined) return '';
@@ -257,8 +276,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            sitesData = data.sites || [];
             const container = document.getElementById('site-list-container');
-            container.innerHTML = data.sites.map(s => {
+            container.innerHTML = sitesData.map(s => {
                 const formUrl = `${baseUrl}/form.php?site=${encodeURIComponent(s.id)}`;
                 const iframeCode = `<iframe src="${formUrl}" width="100%" height="620" style="border:none;"></iframe>`;
                 const urlLink = s.url
@@ -276,6 +296,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="site-name">${esc(s.name)}</div>
                                 <div class="site-meta">
                                     <span class="site-id-badge">ID: ${esc(s.id)}</span>
+                                    <span class="mail-setting-badge">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                                        ${esc(s.from_name)} &lt;${esc(s.from_email)}&gt;
+                                    </span>
                                     ${urlLink}
                                 </div>
                             </div>
@@ -284,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <a href="${esc(formUrl)}" target="_blank" class="btn-action" title="フォームをプレビュー">
                                 <span>フォーム確認 ↗</span>
                             </a>
-                            <button type="button" class="btn-action btn-edit" title="編集" data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-url="${esc(s.url || '')}">
+                            <button type="button" class="btn-action btn-edit" title="編集" data-id="${esc(s.id)}">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                                 <span>編集</span>
                             </button>
@@ -318,6 +342,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btn-add-site').addEventListener('click', function() {
         document.getElementById('form-site').reset();
         document.getElementById('site-id').value = '';
+        const baseSite = sitesData[0] || {};
+        document.getElementById('site-from-email').value = baseSite.from_email || 'no-reply@cc-circle.net';
+        document.getElementById('site-from-name').value = '';
+        document.getElementById('site-signature').value = baseSite.signature || "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
         document.getElementById('modal-title').textContent = 'サイトを追加';
         document.getElementById('modal-site').classList.add('open');
     });
@@ -326,10 +354,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', async function(e) {
         const editBtn = e.target.closest('.btn-edit');
         if (editBtn) {
+            const targetId = editBtn.dataset.id;
+            const site = sitesData.find(s => s.id === targetId);
+            if (!site) return;
+
             document.getElementById('form-site').reset();
-            document.getElementById('site-id').value = editBtn.dataset.id;
-            document.getElementById('site-name').value = editBtn.dataset.name;
-            document.getElementById('site-url').value = editBtn.dataset.url;
+            document.getElementById('site-id').value = site.id;
+            document.getElementById('site-name').value = site.name || '';
+            document.getElementById('site-url').value = site.url || '';
+            document.getElementById('site-from-email').value = site.from_email || 'no-reply@cc-circle.net';
+            document.getElementById('site-from-name').value = site.from_name || '';
+            document.getElementById('site-signature').value = site.signature || '';
             document.getElementById('modal-title').textContent = 'サイトを編集';
             document.getElementById('modal-site').classList.add('open');
             return;

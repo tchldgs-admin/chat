@@ -49,16 +49,6 @@ if (isset($_GET['sent'])) {
 $stmt_msgs = $pdo->prepare("SELECT * FROM messages WHERE ticket_id = ? AND sender_type != 'memo' ORDER BY created_at ASC");
 $stmt_msgs->execute([$ticket_id]);
 $messages = $stmt_msgs->fetchAll();
-
-// ステータスの表示名
-$status_labels = [
-    11 => ['label' => '受付済（対応待ち）', 'color' => '#e53e3e'],
-    12 => ['label' => '対応中', 'color' => '#3182ce'],
-    13 => ['label' => '保留中', 'color' => '#d69e2e'],
-    21 => ['label' => '解決済', 'color' => '#38a169'],
-    31 => ['label' => 'クローズ', 'color' => '#718096'],
-];
-$st = $status_labels[$ticket['status']] ?? ['label' => '確認中', 'color' => '#718096'];
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -71,7 +61,6 @@ $st = $status_labels[$ticket['status']] ?? ['label' => '確認中', 'color' => '
         .container { max-width: 750px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 24px; }
         .header { border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 20px; }
         .ticket-meta { font-size: 13px; color: #718096; margin-bottom: 6px; }
-        .status-badge { display: inline-block; color: #fff; font-size: 12px; font-weight: bold; padding: 3px 10px; border-radius: 12px; margin-left: 8px; }
         h1 { font-size: 20px; margin: 8px 0 0; }
         .message-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
         .msg-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; }
@@ -84,8 +73,6 @@ $st = $status_labels[$ticket['status']] ?? ['label' => '確認中', 'color' => '
         .btn-reply { background: #3182ce; color: #fff; border: none; padding: 10px 24px; font-size: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; }
         .btn-reply:hover { background: #2b6cb0; }
         .alert-info { background: #c6f6d5; color: #22543d; padding: 12px; border-radius: 4px; margin-bottom: 16px; font-size: 14px; }
-        .new-ticket-note { margin-top: 16px; font-size: 12px; color: #718096; }
-        .new-ticket-note a { color: #3182ce; }
     </style>
 </head>
 <body>
@@ -97,7 +84,6 @@ $st = $status_labels[$ticket['status']] ?? ['label' => '確認中', 'color' => '
     <div class="header">
         <div class="ticket-meta">
             チケットID: #<?php echo htmlspecialchars($ticket['id']); ?>
-            <span class="status-badge" style="background: <?php echo $st['color']; ?>;"><?php echo $st['label']; ?></span>
         </div>
         <h1><?php echo htmlspecialchars($ticket['subject']); ?></h1>
     </div>
@@ -120,9 +106,6 @@ $st = $status_labels[$ticket['status']] ?? ['label' => '確認中', 'color' => '
             <textarea name="reply_body" required placeholder="追加の返信内容をご入力ください"></textarea>
             <button type="submit" class="btn-reply">返信を送信する</button>
         </form>
-        <div class="new-ticket-note">
-            ※別の新しいお問い合わせをされる場合は、<a href="form.php">新規お問い合わせフォーム</a>よりご連絡ください。
-        </div>
     </div>
 </div>
 </body>

@@ -57,15 +57,23 @@ try {
 
 // 2. 設定ファイル（config.json）の読み込み・初期作成
 $config_file = __DIR__ . '/config.json';
+$default_signature = "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
 $default_config = [
     'from_email' => 'no-reply@cc-circle.net',
     'from_name'  => 'サポートデスク',
-    'signature'  => "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------",
+    'signature'  => $default_signature,
     'agents'     => ['担当者A', '担当者B', 'サポート窓口'],
     'categories' => ['一般問い合わせ', '操作方法', '不具合・エラー', '契約・お支払い', 'その他'],
     'site_name'  => 'メインサイト',
     'sites'      => [
-        ['id' => 'default', 'name' => 'メインサイト', 'url' => '']
+        [
+            'id'         => 'default',
+            'name'       => 'メインサイト',
+            'url'        => '',
+            'from_email' => 'no-reply@cc-circle.net',
+            'from_name'  => 'サポートデスク',
+            'signature'  => $default_signature
+        ]
     ]
 ];
 
@@ -75,16 +83,43 @@ if (!file_exists($config_file)) {
 $loaded_config = json_decode(file_get_contents($config_file), true);
 $config = array_merge($default_config, is_array($loaded_config) ? $loaded_config : []);
 
-// 既存のconfig.jsonにsites配列がなければ初期サイトを作成
 if (empty($config['sites']) || !is_array($config['sites'])) {
     $initial_name = !empty($config['site_name']) ? $config['site_name'] : 'メインサイト';
     $config['sites'] = [
-        ['id' => 'default', 'name' => $initial_name, 'url' => '']
+        [
+            'id'         => 'default',
+            'name'       => $initial_name,
+            'url'        => '',
+            'from_email' => $config['from_email'] ?? 'no-reply@cc-circle.net',
+            'from_name'  => $config['from_name'] ?? 'サポートデスク',
+            'signature'  => $config['signature'] ?? $default_signature
+        ]
     ];
     file_put_contents($config_file, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
 
-// 共通メール送信関数（差出人名・署名・-fオプション対応）
+// サイト名から該当サイトのメール設定を取得する関数
+function get_site_mail_settings($config, $site_name) {
+    $fallback = [
+        'from_email' => $config['sites'][0]['from_email'] ?? ($config['from_email'] ?? 'no-reply@cc-circle.net'),
+        'from_name'  => $config['sites'][0]['from_name'] ?? ($config['from_name'] ?? 'サポートデスク'),
+        'signature'  => $config['sites'][0]['signature'] ?? ($config['signature'] ?? '')
+    ];
+    if (!empty($config['sites']) && is_array($config['sites'])) {
+        foreach ($config['sites'] as $s) {
+            if (($s['name'] ?? '') === $site_name) {
+                return [
+                    'from_email' => !empty($s['from_email']) ? $s['from_email'] : $fallback['from_email'],
+                    'from_name'  => !empty($s['from_name'])  ? $s['from_name']  : $fallback['from_name'],
+                    'signature'  => isset($s['signature'])     ? $s['signature']  : $fallback['signature']
+                ];
+            }
+        }
+    }
+    return $fallback;
+}
+
+// 共通メール送信関数
 function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
     $encoded_name = mb_encode_mimeheader($from_name, "UTF-8", "B", "\n");
     $headers  = "From: {$encoded_name} <{$from_email}>\r\n";
@@ -291,7 +326,7 @@ try {
     }
 
     // --------------------------------------------------
-    // 3. 返信送信・社内メモ追加・ステータス更新
+    // 3. 返信送信・社内メモ追加・ステータス更新（サイト別のメール設定を使用）
     // --------------------------------------------------
     if ($action === 'reply') {
         $ticket_id  = (int)($_POST['ticket_id'] ?? 0);
@@ -326,15 +361,15 @@ try {
             $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
             $ticket_url = $protocol . $domain . $dir . "/view.php?id=" . $ticket['id'] . "&key=" . $ticket['secret_key'];
 
-            $signature = $config['signature'] ?? '';
+            $site_mail = get_site_mail_settings($config, $ticket['site_name'] ?? '');
             $mail_subject = "Re: {$ticket['subject']}（チケットID: #{$ticket['id']}）";
             $mail_body = "{$ticket['customer_name']} 様\n\n"
                        . "{$body}\n\n"
                        . "■これまでのやり取りの確認・追加のご返信はこちら\n"
                        . "{$ticket_url}\n\n"
-                       . $signature;
+                       . $site_mail['signature'];
 
-            $mail_ok = send_tc_mail($ticket['customer_email'], $mail_subject, $mail_body, $config['from_email'], $config['from_name']);
+            $mail_ok = send_tc_mail($ticket['customer_email'], $mail_subject, $mail_body, $site_mail['from_email'], $site_mail['from_name']);
             if (!$mail_ok) {
                 throw new Exception('メッセージは保存されましたが、メール送信に失敗しました。サーバーのメール設定を確認してください。');
             }
@@ -382,7 +417,7 @@ try {
     }
 
     // --------------------------------------------------
-    // 5. 「+ チケットを追加」からの新規作成
+    // 5. 「+ チケットを追加」からの新規作成（サイト別のメール設定を使用）
     // --------------------------------------------------
     if ($action === 'create_ticket') {
         $name      = trim($_POST['customer_name'] ?? '');
@@ -414,15 +449,15 @@ try {
             $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
             $ticket_url = $protocol . $domain . $dir . "/view.php?id=" . $ticket_id . "&key=" . $secret_key;
 
-            $signature = $config['signature'] ?? '';
+            $site_mail = get_site_mail_settings($config, $site_name);
             $mail_subject = "{$subject}（チケットID: #{$ticket_id}）";
             $mail_body = "{$name} 様\n\n"
                        . "{$body}\n\n"
                        . "■内容の確認・ご返信はこちら\n"
                        . "{$ticket_url}\n\n"
-                       . $signature;
+                       . $site_mail['signature'];
 
-            $mail_ok = send_tc_mail($email, $mail_subject, $mail_body, $config['from_email'], $config['from_name']);
+            $mail_ok = send_tc_mail($email, $mail_subject, $mail_body, $site_mail['from_email'], $site_mail['from_name']);
             if (!$mail_ok) {
                 throw new Exception('チケットは作成されましたが、メール送信に失敗しました。');
             }
@@ -433,19 +468,13 @@ try {
     }
 
     // --------------------------------------------------
-    // 6. 「⚙ チケット設定」の保存（sites配列は維持する）
+    // 6. 「⚙ チケット設定」の保存（担当者・カテゴリのみ更新）
     // --------------------------------------------------
     if ($action === 'save_settings') {
-        $new_config = [
-            'from_email' => trim($_POST['from_email'] ?? 'no-reply@cc-circle.net'),
-            'from_name'  => trim($_POST['from_name'] ?? 'サポートデスク'),
-            'signature'  => $_POST['signature'] ?? '',
-            'site_name'  => $config['site_name'],
-            'sites'      => $config['sites'],
-            'agents'     => array_values(array_filter(array_map('trim', explode("\n", $_POST['agents'] ?? '')))),
-            'categories' => array_values(array_filter(array_map('trim', explode("\n", $_POST['categories'] ?? '')))),
-        ];
-        if (file_put_contents($config_file, json_encode($new_config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) === false) {
+        $config['agents']     = array_values(array_filter(array_map('trim', explode("\n", $_POST['agents'] ?? ''))));
+        $config['categories'] = array_values(array_filter(array_map('trim', explode("\n", $_POST['categories'] ?? ''))));
+
+        if (file_put_contents($config_file, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) === false) {
             throw new Exception('設定ファイル（config.json）の保存に失敗しました。ファイルの書き込み権限を確認してください。');
         }
         echo json_encode(['success' => true]);
