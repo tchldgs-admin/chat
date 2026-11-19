@@ -39,13 +39,28 @@ $default_config = [
     'from_email' => 'no-reply@cc-circle.net',
     'from_name'  => 'サポートデスク',
     'signature'  => "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------",
-    'site_name'  => 'メインサイト'
+    'site_name'  => 'メインサイト',
+    'sites'      => [
+        ['id' => 'default', 'name' => 'メインサイト', 'url' => '']
+    ]
 ];
 $config = $default_config;
 if (file_exists($config_file)) {
     $loaded = json_decode(file_get_contents($config_file), true);
     if (is_array($loaded)) {
         $config = array_merge($default_config, $loaded);
+    }
+}
+
+// サイトIDの特定（GETまたはPOSTのsiteパラメータから該当サイト名を取得）
+$site_param = trim($_REQUEST['site'] ?? '');
+$target_site_name = $config['sites'][0]['name'] ?? ($config['site_name'] ?? 'メインサイト');
+if ($site_param !== '' && !empty($config['sites']) && is_array($config['sites'])) {
+    foreach ($config['sites'] as $s) {
+        if (($s['id'] ?? '') === $site_param) {
+            $target_site_name = $s['name'];
+            break;
+        }
     }
 }
 
@@ -86,13 +101,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // お客様専用の合言葉（ランダムな32文字の英数字）を生成
             $secret_key = bin2hex(random_bytes(16));
-            $site_name  = $config['site_name'] ?? 'メインサイト';
 
-            // 1. ticketsテーブルに新規レコードを挿入（必ず新しいチケットIDを発行）
+            // 1. ticketsテーブルに新規レコードを挿入（特定したサイト名を保存）
             $columns = $pdo->query("SHOW COLUMNS FROM tickets")->fetchAll(PDO::FETCH_COLUMN);
             if (in_array('site_name', $columns)) {
                 $stmt = $pdo->prepare("INSERT INTO tickets (secret_key, customer_name, customer_email, subject, site_name, status, is_read) VALUES (?, ?, ?, ?, ?, 11, 0)");
-                $stmt->execute([$secret_key, $name, $email, $subject, $site_name]);
+                $stmt->execute([$secret_key, $name, $email, $subject, $target_site_name]);
             } else {
                 $stmt = $pdo->prepare("INSERT INTO tickets (secret_key, customer_name, customer_email, subject, status) VALUES (?, ?, ?, ?, 11)");
                 $stmt->execute([$secret_key, $name, $email, $subject]);
@@ -140,6 +154,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+$form_action = 'form.php' . ($site_param !== '' ? '?site=' . urlencode($site_param) : '');
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -182,14 +198,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php echo htmlspecialchars($ticket_url, ENT_QUOTES, 'UTF-8'); ?>
                 </a>
             </div>
-            <a href="form.php" class="btn-another">別のお問い合わせを送る</a>
+            <a href="<?php echo htmlspecialchars($form_action, ENT_QUOTES, 'UTF-8'); ?>" class="btn-another">別のお問い合わせを送る</a>
         </div>
     <?php else: ?>
         <?php if ($error_message): ?>
             <div class="alert-error"><?php echo htmlspecialchars($error_message, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php endif; ?>
 
-        <form method="post" action="form.php">
+        <form method="post" action="<?php echo htmlspecialchars($form_action, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="site" value="<?php echo htmlspecialchars($site_param, ENT_QUOTES, 'UTF-8'); ?>">
             <div class="form-group">
                 <label>お名前<span class="badge-req">必須</span></label>
                 <input type="text" name="customer_name" required placeholder="例：山田 太郎" value="<?php echo htmlspecialchars($_POST['customer_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">

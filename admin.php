@@ -112,7 +112,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         .mail-icon { color: #718096; }
         .subject-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .col-visitor { display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
-        .col-assignee, .col-elapsed, .col-site { color: #4a5568; font-size: 12px; }
+        .col-assignee, .col-elapsed, .col-site { color: #4a5568; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .col-id { color: #4a5568; font-size: 12px; text-align: right; padding-right: 8px; }
         
         .status-pill { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: bold; color: #fff; flex-shrink: 0; }
@@ -189,7 +189,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         </ul>
     </div>
     <div class="header-right">
-        <a href="form.php" target="_blank" class="form-link-btn">お客様用フォームを開く ↗</a>
+        <a href="admin_sites.php" class="form-link-btn">フォーム埋め込み・サイト管理 ↗</a>
         <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
             <?php echo htmlspecialchars($admin_email, ENT_QUOTES, 'UTF-8'); ?>
@@ -258,6 +258,12 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         <div class="side-group-title">設定</div>
         <ul class="side-menu">
             <li>
+                <a href="admin_sites.php">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    <span>サイト管理</span>
+                </a>
+            </li>
+            <li>
                 <a href="admin_users.php">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                     <span>担当者管理</span>
@@ -278,6 +284,10 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
                 <span>〜</span>
                 <input type="date" name="end_date" class="form-control" title="終了日">
 
+                <select name="site_name" id="filter-site" class="form-control">
+                    <option value="">サイト</option>
+                </select>
+
                 <select name="assignee" id="filter-assignee" class="form-control">
                     <option value="">担当者</option>
                     <option value="unassigned">(未割り当て)</option>
@@ -287,7 +297,7 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
                     <option value="">カテゴリ</option>
                 </select>
 
-                <input type="text" name="word" class="form-control" style="width:210px;" placeholder="フリーワード検索">
+                <input type="text" name="word" class="form-control" style="width:200px;" placeholder="フリーワード検索">
 
                 <span class="detail-toggle" id="toggle-search-detail">
                     詳細 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
@@ -366,6 +376,10 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
         <form id="form-create-ticket">
             <div class="modal-body">
                 <div class="m-group">
+                    <label>サイト *</label>
+                    <select name="site_name" id="create-site" class="form-control" required></select>
+                </div>
+                <div class="m-group">
                     <label>訪問者名（お客様名）*</label>
                     <input type="text" name="customer_name" class="form-control" required placeholder="例：山田 太郎">
                 </div>
@@ -421,10 +435,6 @@ $admin_email = $_SESSION['admin_email'] ?? '管理者';
                 <div class="m-group">
                     <label>差出人名</label>
                     <input type="text" name="from_name" id="set-from-name" class="form-control" required>
-                </div>
-                <div class="m-group">
-                    <label>デフォルトのサイト名</label>
-                    <input type="text" name="site_name" id="set-site-name" class="form-control">
                 </div>
                 <div class="m-group">
                     <label>メール署名（返信メールの末尾に自動挿入されます）</label>
@@ -579,6 +589,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function populateSelects() {
         const agents = appConfig.agents || [];
         const cats = appConfig.categories || [];
+        const sites = appConfig.sites || [];
+
+        const filterSite = document.getElementById('filter-site');
+        const curSite = filterSite.value;
+        filterSite.innerHTML = '<option value="">サイト</option>' +
+            sites.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+        filterSite.value = curSite;
 
         const filterAss = document.getElementById('filter-assignee');
         const curAss = filterAss.value;
@@ -594,6 +611,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         document.getElementById('bulk-assignee-select').innerHTML = '<option value="">担当者を変更...</option>' +
             agents.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+
+        document.getElementById('create-site').innerHTML =
+            sites.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
 
         document.getElementById('create-assignee').innerHTML = '<option value="">(未割り当て)</option>' +
             agents.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
@@ -650,6 +670,8 @@ document.addEventListener('DOMContentLoaded', function() {
             panel.innerHTML = `
                 <div class="detail-meta-bar">
                     <div class="meta-group">
+                        <span class="meta-label">サイト:</span>
+                        <span style="font-weight:bold; color:#2d3748;">${esc(t.site_name)}</span>
                         <span class="meta-label">担当者:</span>
                         <select class="form-control inline-update" data-id="${t.id}" data-field="assignee">${agentOpts}</select>
                         <span class="meta-label">カテゴリ:</span>
@@ -696,7 +718,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // クリックイベントの一元管理
     document.addEventListener('click', async function(e) {
-        // 1. チケット行のクリックで展開・折りたたみ
         const row = e.target.closest('.ticket-row');
         if (row && !e.target.closest('.no-expand')) {
             const item = row.closest('.ticket-item');
@@ -713,14 +734,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 2. スレッド内の個別メッセージ開閉
         const eventHeader = e.target.closest('.event-header');
         if (eventHeader) {
             eventHeader.closest('.event-card').classList.toggle('collapsed');
             return;
         }
 
-        // 3. 返信タブ切り替え
         const replyTab = e.target.closest('.reply-tab');
         if (replyTab) {
             const box = replyTab.closest('.reply-editor-box');
@@ -746,7 +765,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 4. 返信・メモの送信
         const submitReplyBtn = e.target.closest('.btn-submit-reply');
         if (submitReplyBtn) {
             const ticketId = submitReplyBtn.dataset.id;
@@ -780,7 +798,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 5. ステータスのみ更新
         const statusOnlyBtn = e.target.closest('.btn-status-only');
         if (statusOnlyBtn) {
             const ticketId = statusOnlyBtn.dataset.id;
@@ -790,7 +807,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 6. ゴミ箱へ移動
         const trashBtn = e.target.closest('.btn-trash-ticket');
         if (trashBtn) {
             if (!confirm('このチケットをゴミ箱へ移動しますか？')) return;
@@ -799,7 +815,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 7. 未読ドットクリック
         const unreadDot = e.target.closest('.unread-dot');
         if (unreadDot) {
             const nextVal = unreadDot.dataset.read == 1 ? 0 : 1;
@@ -808,19 +823,18 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 8. 左サイドバー絞り込み
         const sideItem = e.target.closest('#side-status-menu li');
         if (sideItem) {
             e.preventDefault();
             document.querySelectorAll('#side-status-menu li').forEach(li => li.classList.remove('active'));
             sideItem.classList.add('active');
             currentStatusGroup = sideItem.dataset.status;
-            document.getElementById('current-view-title').textContent = sideItem.dataset.title || '';
+            const spanText = sideItem.querySelector('span');
+            document.getElementById('current-view-title').textContent = sideItem.dataset.title || (spanText ? spanText.textContent.trim() : '');
             loadTickets();
             return;
         }
 
-        // 9. ソート列クリック
         const sortCol = e.target.closest('.sort-col');
         if (sortCol) {
             const col = sortCol.dataset.sort;
@@ -834,7 +848,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 10. モーダル閉じる
         const closeBtn = e.target.closest('.modal-close');
         if (closeBtn) {
             closeBtn.closest('.modal-overlay').classList.remove('open');
@@ -842,7 +855,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 変更イベント（プルダウン・チェックボックス）の一元管理
     document.addEventListener('change', async function(e) {
         if (e.target.classList.contains('inline-update')) {
             await apiPost({
@@ -887,7 +899,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 検索フォーム関連
     document.getElementById('search-form').addEventListener('submit', function(e) {
         e.preventDefault();
         loadTickets();
@@ -900,7 +911,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('search-detail-area').classList.toggle('open');
     });
 
-    // チケット追加モーダル
     document.getElementById('btn-open-create').addEventListener('click', function() {
         document.getElementById('form-create-ticket').reset();
         document.getElementById('modal-create').classList.add('open');
@@ -919,11 +929,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // チケット設定モーダル
     document.getElementById('btn-open-settings').addEventListener('click', function() {
         document.getElementById('set-from-email').value = appConfig.from_email || '';
         document.getElementById('set-from-name').value = appConfig.from_name || '';
-        document.getElementById('set-site-name').value = appConfig.site_name || '';
         document.getElementById('set-signature').value = appConfig.signature || '';
         document.getElementById('set-agents').value = (appConfig.agents || []).join("\n");
         document.getElementById('set-categories').value = (appConfig.categories || []).join("\n");
@@ -942,7 +950,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 初回読み込み
     loadTickets();
 });
 </script>

@@ -14,7 +14,6 @@ mb_internal_encoding("UTF-8");
 
 // 1. データベースの自動連番（AUTO_INCREMENT）設定とカラムの自動チェック・修復
 try {
-    // ticketsテーブルのid連番設定チェックと修復
     $id_col = $pdo->query("SHOW COLUMNS FROM tickets WHERE Field = 'id'")->fetch();
     if ($id_col && stripos($id_col['Extra'] ?? '', 'auto_increment') === false) {
         $pdo->exec("SET @t_seq = 0");
@@ -27,7 +26,6 @@ try {
         }
     }
 
-    // messagesテーブルのid連番設定チェックと修復
     $msg_id_col = $pdo->query("SHOW COLUMNS FROM messages WHERE Field = 'id'")->fetch();
     if ($msg_id_col && stripos($msg_id_col['Extra'] ?? '', 'auto_increment') === false) {
         $pdo->exec("SET @m_seq = 0");
@@ -40,7 +38,6 @@ try {
         }
     }
 
-    // 必要なカラムがなければ自動追加
     $columns = $pdo->query("SHOW COLUMNS FROM tickets")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('assignee', $columns)) {
         $pdo->exec("ALTER TABLE tickets ADD COLUMN assignee VARCHAR(100) DEFAULT '' AFTER subject");
@@ -66,7 +63,10 @@ $default_config = [
     'signature'  => "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------",
     'agents'     => ['担当者A', '担当者B', 'サポート窓口'],
     'categories' => ['一般問い合わせ', '操作方法', '不具合・エラー', '契約・お支払い', 'その他'],
-    'site_name'  => 'メインサイト'
+    'site_name'  => 'メインサイト',
+    'sites'      => [
+        ['id' => 'default', 'name' => 'メインサイト', 'url' => '']
+    ]
 ];
 
 if (!file_exists($config_file)) {
@@ -74,6 +74,15 @@ if (!file_exists($config_file)) {
 }
 $loaded_config = json_decode(file_get_contents($config_file), true);
 $config = array_merge($default_config, is_array($loaded_config) ? $loaded_config : []);
+
+// 既存のconfig.jsonにsites配列がなければ初期サイトを作成
+if (empty($config['sites']) || !is_array($config['sites'])) {
+    $initial_name = !empty($config['site_name']) ? $config['site_name'] : 'メインサイト';
+    $config['sites'] = [
+        ['id' => 'default', 'name' => $initial_name, 'url' => '']
+    ];
+    file_put_contents($config_file, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
 
 // 共通メール送信関数（差出人名・署名・-fオプション対応）
 function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
@@ -174,6 +183,10 @@ try {
         if (!empty($_GET['end_date'])) {
             $where[] = "DATE(created_at) <= ?";
             $params[] = $_GET['end_date'];
+        }
+        if (!empty($_GET['site_name'])) {
+            $where[] = "site_name = ?";
+            $params[] = $_GET['site_name'];
         }
         if (!empty($_GET['assignee'])) {
             if ($_GET['assignee'] === 'unassigned') {
@@ -307,7 +320,6 @@ try {
 
         $pdo->commit();
 
-        // 「お客様へ返信」の場合は、返信のたびにお客様へメール通知を送信
         if ($reply_type === 'support' && $body !== '') {
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
             $domain = $_SERVER['HTTP_HOST'];
@@ -373,12 +385,13 @@ try {
     // 5. 「+ チケットを追加」からの新規作成
     // --------------------------------------------------
     if ($action === 'create_ticket') {
-        $name     = trim($_POST['customer_name'] ?? '');
-        $email    = trim($_POST['customer_email'] ?? '');
-        $subject  = trim($_POST['subject'] ?? '');
-        $body     = trim($_POST['body'] ?? '');
-        $assignee = trim($_POST['assignee'] ?? '');
-        $category = trim($_POST['category'] ?? '');
+        $name      = trim($_POST['customer_name'] ?? '');
+        $email     = trim($_POST['customer_email'] ?? '');
+        $subject   = trim($_POST['subject'] ?? '');
+        $body      = trim($_POST['body'] ?? '');
+        $assignee  = trim($_POST['assignee'] ?? '');
+        $category  = trim($_POST['category'] ?? '');
+        $site_name = trim($_POST['site_name'] ?? ($config['sites'][0]['name'] ?? $config['site_name']));
         $send_mail = !empty($_POST['send_mail']);
 
         if ($name === '' || $email === '' || $subject === '' || $body === '') {
@@ -388,7 +401,7 @@ try {
         $pdo->beginTransaction();
         $secret_key = bin2hex(random_bytes(16));
         $stmt = $pdo->prepare("INSERT INTO tickets (secret_key, customer_name, customer_email, subject, assignee, site_name, category, status, is_read) VALUES (?, ?, ?, ?, ?, ?, ?, 12, 1)");
-        $stmt->execute([$secret_key, $name, $email, $subject, $assignee, $config['site_name'], $category]);
+        $stmt->execute([$secret_key, $name, $email, $subject, $assignee, $site_name, $category]);
         $ticket_id = $pdo->lastInsertId();
 
         $stmt_m = $pdo->prepare("INSERT INTO messages (ticket_id, sender_type, body) VALUES (?, 'support', ?)");
@@ -420,14 +433,15 @@ try {
     }
 
     // --------------------------------------------------
-    // 6. 「⚙ チケット設定」の保存
+    // 6. 「⚙ チケット設定」の保存（sites配列は維持する）
     // --------------------------------------------------
     if ($action === 'save_settings') {
         $new_config = [
             'from_email' => trim($_POST['from_email'] ?? 'no-reply@cc-circle.net'),
             'from_name'  => trim($_POST['from_name'] ?? 'サポートデスク'),
             'signature'  => $_POST['signature'] ?? '',
-            'site_name'  => trim($_POST['site_name'] ?? 'メインサイト'),
+            'site_name'  => $config['site_name'],
+            'sites'      => $config['sites'],
             'agents'     => array_values(array_filter(array_map('trim', explode("\n", $_POST['agents'] ?? '')))),
             'categories' => array_values(array_filter(array_map('trim', explode("\n", $_POST['categories'] ?? '')))),
         ];
