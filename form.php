@@ -11,7 +11,6 @@ mb_internal_encoding("UTF-8");
 $captcha_secret = hash('sha256', ($dsn ?? '') . ($user ?? '') . ($password ?? 'tc_plus_salt_2026'));
 
 function generate_captcha_data($secret) {
-    // 読み間違えやすい文字（0, O, 1, I, l）を除いた英数字
     $chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     $code = '';
     for ($i = 0; $i < 5; $i++) {
@@ -20,7 +19,6 @@ function generate_captcha_data($secret) {
     $issued_at = time();
     $payload = $code . '|' . $issued_at;
 
-    // 暗号化（XOR + Base64URL）と改ざん防止署名（HMAC）
     $key_bytes = hash('sha256', $secret . '_enc', true);
     $xored = '';
     for ($i = 0; $i < strlen($payload); $i++) {
@@ -148,7 +146,7 @@ if (file_exists($config_file)) {
     }
 }
 
-// ?site=〇〇 パラメータの必須チェック（未指定・無効なIDはフォームを開かせない）
+// ?site=〇〇 パラメータの必須チェック
 $site_param = trim($_REQUEST['site'] ?? '');
 $target_site = null;
 
@@ -225,20 +223,60 @@ $target_from_email = !empty($target_site['from_email']) ? $target_site['from_ema
 $target_from_name  = !empty($target_site['from_name'])  ? $target_site['from_name']  : ($config['from_name'] ?? 'サポートデスク');
 $target_signature  = isset($target_site['signature'])     ? $target_site['signature']  : ($config['signature'] ?? $default_signature);
 
-// 共通メール送信関数
+// --------------------------------------------------
+// 確実配信対応・共通メール送信関数
+// --------------------------------------------------
 function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
-    $encoded_name = mb_encode_mimeheader($from_name, "UTF-8", "B", "\n");
-    $headers  = "From: {$encoded_name} <{$from_email}>\r\n";
-    $headers .= "Reply-To: {$from_email}\r\n";
-    $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-    $headers .= "Content-Transfer-Encoding: 8bit";
+    $to         = trim(str_replace(["\r", "\n"], '', (string)$to));
+    $from_email = trim(str_replace(["\r", "\n"], '', (string)$from_email));
+    $from_name  = trim(str_replace(["\r", "\n"], ' ', (string)$from_name));
+    $subject    = trim(str_replace(["\r", "\n"], ' ', (string)$subject));
 
-    $additional_params = '';
-    if (filter_var($from_email, FILTER_VALIDATE_EMAIL)) {
-        $additional_params = "-f" . $from_email;
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return false;
     }
-    return mb_send_mail($to, $subject, $body, $headers, $additional_params);
+
+    // サーバーのドメインを取得（例: cc-circle.net）
+    $server_host = preg_replace('/^www\./i', '', $_SERVER['HTTP_HOST'] ?? 'cc-circle.net');
+    $server_host = preg_replace('/:\d+$/', '', $server_host);
+    $fallback_sender = 'no-reply@' . $server_host;
+
+    if (!filter_var($from_email, FILTER_VALIDATE_EMAIL)) {
+        $from_email = $fallback_sender;
+    }
+
+    // 差出人ドメインがサーバーのドメインと異なる場合、SPF/なりすましブロックを防ぐため
+    // 実際の送信元(From / -f)にはサーバー正規ドメインを使用し、Reply-Toに指定アドレスを設定する
+    $from_domain   = strtolower(substr(strrchr($from_email, '@'), 1));
+    $server_domain = strtolower($server_host);
+
+    $actual_from_email = $from_email;
+    $reply_to_email    = $from_email;
+
+    if ($from_domain !== $server_domain && substr($from_domain, -strlen('.' . $server_domain)) !== '.' . $server_domain) {
+        $actual_from_email = $fallback_sender;
+        $reply_to_email    = $from_email;
+    }
+
+    $encoded_name    = '=?UTF-8?B?' . base64_encode($from_name) . '?=';
+    $encoded_subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+
+    $normalized_body = str_replace(["\r\n", "\r"], "\n", (string)$body);
+    $encoded_body    = chunk_split(base64_encode($normalized_body));
+
+    $headers  = "From: {$encoded_name} <{$actual_from_email}>\n";
+    $headers .= "Reply-To: {$reply_to_email}\n";
+    $headers .= "MIME-Version: 1.0\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\n";
+    $headers .= "Content-Transfer-Encoding: base64";
+
+    $additional_params = "-f" . $actual_from_email;
+
+    $result = mail($to, $encoded_subject, $encoded_body, $headers, $additional_params);
+    if (!$result) {
+        error_log("Mail Send Failed: to={$to}, from={$actual_from_email}");
+    }
+    return $result;
 }
 
 $is_submitted = false;
@@ -246,7 +284,7 @@ $error_message = '';
 $ticket_url = '';
 
 // --------------------------------------------------
-// フォームが送信されたときの処理（スパム検証 ＋ 新規チケット発行）
+// フォームが送信されたときの処理
 // --------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name          = trim($_POST['customer_name'] ?? '');
@@ -257,11 +295,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $captcha_token = trim($_POST['captcha_token'] ?? '');
     $captcha_input = strtoupper(trim($_POST['captcha_code'] ?? ''));
 
-    // スパム検証①：ハニーポット（隠しフィールドに値が入っていたらボット判定）
     if ($honeypot !== '') {
         $error_message = '不正な送信が検出されました。';
     } else {
-        // スパム検証②：画像認証コード・有効期限・送信速度（2秒未満はボット判定）のチェック
         $decoded = decode_captcha_token($captcha_token, $captcha_secret);
         $now = time();
 
@@ -329,7 +365,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// フォーム表示用の新しい画像認証データを生成
 $captcha_data = generate_captcha_data($captcha_secret);
 $has_gd = function_exists('imagecreatetruecolor');
 $form_action = 'form.php?site=' . urlencode($site_param);
@@ -352,7 +387,6 @@ $form_action = 'form.php?site=' . urlencode($site_param);
         input:focus, textarea:focus { outline: none; border-color: #2b6cb0; box-shadow: 0 0 0 2px rgba(43,108,176,0.2); }
         textarea { height: 140px; resize: vertical; }
         
-        /* スパム対策：画像認証エリア */
         .captcha-box {
             background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; margin-bottom: 18px;
         }
@@ -380,7 +414,6 @@ $form_action = 'form.php?site=' . urlencode($site_param);
         }
         .captcha-note { font-size: 12px; color: #718096; margin-top: 6px; }
 
-        /* ハニーポット（人間には非表示） */
         .hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 
         .btn-submit {
@@ -418,7 +451,6 @@ $form_action = 'form.php?site=' . urlencode($site_param);
             <input type="hidden" name="site" value="<?php echo htmlspecialchars($site_param, ENT_QUOTES, 'UTF-8'); ?>">
             <input type="hidden" name="captcha_token" id="captcha-token" value="<?php echo htmlspecialchars($captcha_data['token'], ENT_QUOTES, 'UTF-8'); ?>">
 
-            <!-- スパムボット対策用ダミー入力欄 -->
             <div class="hp-field" aria-hidden="true">
                 <label for="website_url">Website</label>
                 <input type="text" name="website_url" id="website_url" tabindex="-1" autocomplete="off">
@@ -441,7 +473,6 @@ $form_action = 'form.php?site=' . urlencode($site_param);
                 <textarea name="body" required placeholder="お問い合わせ内容をご記入ください"><?php echo htmlspecialchars($_POST['body'] ?? '', ENT_QUOTES, 'UTF-8'); ?></textarea>
             </div>
 
-            <!-- 画像認証（スパム対策） -->
             <div class="captcha-box">
                 <label style="margin-bottom:2px;">スパム防止認証<span class="badge-req">必須</span></label>
                 <div class="captcha-row">
