@@ -224,7 +224,7 @@ $target_from_name  = !empty($target_site['from_name'])  ? $target_site['from_nam
 $target_signature  = isset($target_site['signature'])     ? $target_site['signature']  : ($config['signature'] ?? $default_signature);
 
 // --------------------------------------------------
-// 共通メール送信関数（mb_send_mailベース・リトライ機能付き）
+// 共通メール送信関数（シンプルなmb_send_mail方式）
 // --------------------------------------------------
 function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
     mb_language("Japanese");
@@ -239,20 +239,8 @@ function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
         return false;
     }
 
-    $encoded_name = mb_encode_mimeheader($from_name, "UTF-8", "B", "\r\n ");
-    $headers  = "From: {$encoded_name} <{$from_email}>\r\n";
-    $headers .= "Reply-To: {$from_email}";
-
-    $additional_params = '';
-    if (filter_var($from_email, FILTER_VALIDATE_EMAIL)) {
-        $additional_params = "-f" . $from_email;
-    }
-
-    $result = mb_send_mail($to, $subject, $body, $headers, $additional_params);
-    if (!$result && $additional_params !== '') {
-        $result = mb_send_mail($to, $subject, $body, $headers);
-    }
-    return $result;
+    $headers = "From: " . mb_encode_mimeheader($from_name) . " <{$from_email}>";
+    return mb_send_mail($to, $subject, $body, $headers);
 }
 
 $is_submitted = false;
