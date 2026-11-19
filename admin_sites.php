@@ -13,7 +13,6 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
 require_once 'db.php';
 
-// DBから最新の表示名と権限を取得してセッションに同期
 $stmt_me = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
 $stmt_me->execute([$_SESSION['admin_email'] ?? '']);
 $me = $stmt_me->fetch();
@@ -25,13 +24,11 @@ if ($me) {
 $admin_name = $_SESSION['admin_name'] ?? '管理者';
 $admin_role = $_SESSION['admin_role'] ?? 'admin';
 
-// 「一般」権限の場合はチケット画面へリダイレクト
 if ($admin_role !== 'admin') {
     header("Location: admin.php");
     exit;
 }
 
-// 現在の設置URLベースを自動取得
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
 $domain = $_SERVER['HTTP_HOST'] ?? 'cc-circle.net';
 $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
@@ -101,11 +98,13 @@ $base_url = $protocol . $domain . $dir;
         .site-info { display: flex; align-items: center; gap: 14px; }
         .site-icon { width: 42px; height: 42px; background: #ebf8ff; color: var(--primary-blue); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
         .site-name { font-size: 16px; font-weight: bold; color: #2d3748; margin-bottom: 4px; }
-        .site-meta { font-size: 12px; color: #718096; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+        .site-meta { font-size: 12px; color: #718096; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .site-meta a { color: #2b6cb0; text-decoration: none; }
         .site-meta a:hover { text-decoration: underline; }
         .site-id-badge { background: #edf2f7; color: #4a5568; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
         .mail-setting-badge { background: #f0fff4; border: 1px solid #c6f6d5; color: #276749; padding: 2px 8px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
+        .smtp-badge-on { background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .smtp-badge-off { background: #fffaf0; border: 1px solid #fbd38d; color: #c05621; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
 
         .site-actions { display: flex; gap: 8px; }
         .btn-action { background: #f7fafc; border: 1px solid #e2e8f0; color: #4a5568; height: 34px; padding: 0 10px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: bold; text-decoration: none; transition: all 0.2s; }
@@ -130,19 +129,23 @@ $base_url = $protocol . $domain . $dir;
         /* モーダル */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
         .modal-overlay.open { display: flex; }
-        .modal-dialog { background: #fff; width: 540px; max-width: 94vw; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
+        .modal-dialog { background: #fff; width: 580px; max-width: 94vw; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
         .modal-header { padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 16px; color: #2d3748; }
         .modal-close { cursor: pointer; color: #a0aec0; display: inline-flex; }
         .modal-close:hover { color: #4a5568; }
-        .modal-body { padding: 20px; max-height: 75vh; overflow-y: auto; }
+        .modal-body { padding: 20px; max-height: 78vh; overflow-y: auto; }
         .modal-footer { padding: 16px 20px; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
         
-        .section-divider { font-size: 12px; font-weight: bold; color: #2b6cb0; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin: 18px 0 12px; }
+        .section-divider { font-size: 12px; font-weight: bold; color: #2b6cb0; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin: 20px 0 12px; }
         .form-group { margin-bottom: 14px; }
         .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #4a5568; }
         .form-control { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px; font-family: inherit; transition: border-color 0.2s; }
         .form-control:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 2px rgba(41, 163, 229, 0.2); }
-        .form-note { font-size: 11px; color: #718096; margin-top: 4px; }
+        .form-note { font-size: 11px; color: #718096; margin-top: 4px; line-height: 1.5; }
+        .smtp-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; }
+        .test-mail-row { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e0; }
+        .btn-test { background: #283e5c; color: #fff; border: none; padding: 0 14px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+        .btn-test:hover { background: #1e2f47; }
         .btn-cancel { background: #fff; border: 1px solid #cbd5e0; color: #4a5568; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; }
         .btn-cancel:hover { background: #f7fafc; }
     </style>
@@ -237,7 +240,6 @@ $base_url = $protocol . $domain . $dir;
                 <div class="form-group">
                     <label>サイト名（管理画面に表示される名前）<span style="color:#e53e3e;">*</span></label>
                     <input type="text" name="name" id="site-name" class="form-control" required placeholder="例: コーポレートサイト、LP① など">
-                    <div class="form-note">※チケット一覧の「サイト名」列に表示されます。</div>
                 </div>
                 
                 <div class="form-group">
@@ -245,21 +247,58 @@ $base_url = $protocol . $domain . $dir;
                     <input type="url" name="url" id="site-url" class="form-control" placeholder="例: https://example.com/contact">
                 </div>
 
-                <div class="section-divider">このサイト専用のメール送信設定</div>
+                <div class="section-divider">基本のメール表示設定</div>
 
-                <div class="form-group">
-                    <label>差出人メールアドレス（From）<span style="color:#e53e3e;">*</span></label>
-                    <input type="email" name="from_email" id="site-from-email" class="form-control" required placeholder="例: no-reply@cc-circle.net">
-                </div>
-
-                <div class="form-group">
-                    <label>差出人名<span style="color:#e53e3e;">*</span></label>
-                    <input type="text" name="from_name" id="site-from-name" class="form-control" required placeholder="例: サポートデスク">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label>差出人メールアドレス（From）<span style="color:#e53e3e;">*</span></label>
+                        <input type="email" name="from_email" id="site-from-email" class="form-control" required placeholder="例: no-reply@cc-circle.net">
+                    </div>
+                    <div class="form-group">
+                        <label>差出人名<span style="color:#e53e3e;">*</span></label>
+                        <input type="text" name="from_name" id="site-from-name" class="form-control" required placeholder="例: サポートデスク">
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label>メール署名（返信メールの末尾に自動挿入されます）</label>
-                    <textarea name="signature" id="site-signature" class="form-control" style="height: 100px; resize: vertical;"></textarea>
+                    <textarea name="signature" id="site-signature" class="form-control" style="height: 85px; resize: vertical;"></textarea>
+                </div>
+
+                <div class="section-divider">SMTP認証送信設定（Google Workspace / 迷惑メール防止）</div>
+                <div class="smtp-box">
+                    <div class="form-note" style="margin-top:0; margin-bottom:10px;">
+                        ※Google Workspace（<code>smtp.gmail.com</code>）やロリポップ（<code>smtp.lolipop.jp</code>）のメールサーバー経由で直接送信する設定です。迷惑メール入りや不達を確実に防げます。
+                    </div>
+                    <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
+                        <div class="form-group">
+                            <label>SMTPサーバー（ホスト名）</label>
+                            <input type="text" name="smtp_host" id="site-smtp-host" class="form-control" placeholder="例: smtp.gmail.com">
+                        </div>
+                        <div class="form-group">
+                            <label>ポート番号</label>
+                            <select name="smtp_port" id="site-smtp-port" class="form-control">
+                                <option value="465">465 (SSL)</option>
+                                <option value="587">587 (TLS)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>SMTPユーザー名（メールアドレス）</label>
+                            <input type="text" name="smtp_user" id="site-smtp-user" class="form-control" placeholder="例: no-reply@cc-circle.net">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>SMTPパスワード / アプリパスワード</label>
+                            <input type="password" name="smtp_pass" id="site-smtp-pass" class="form-control" placeholder="パスワードを入力">
+                            <div class="form-note" id="smtp-pass-note"></div>
+                        </div>
+                    </div>
+
+                    <div class="test-mail-row">
+                        <input type="email" id="test-mail-to" class="form-control" placeholder="テスト送信先メールアドレス（例: 自分のGmail）">
+                        <button type="button" class="btn-test" id="btn-send-test-mail">テストメール送信</button>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -307,6 +346,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const urlLink = s.url
                     ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)} ↗</a>`
                     : `<span style="color:#a0aec0;">設置URL未設定</span>`;
+                const smtpBadge = (s.smtp_host && s.has_smtp_pass)
+                    ? `<span class="smtp-badge-on">SMTP認証: 有効 (${esc(s.smtp_host)})</span>`
+                    : `<span class="smtp-badge-off">SMTP未設定（標準送信）</span>`;
 
                 return `
                 <div class="site-card">
@@ -323,6 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
                                         ${esc(s.from_name)} &lt;${esc(s.from_email)}&gt;
                                     </span>
+                                    ${smtpBadge}
                                     ${urlLink}
                                 </div>
                             </div>
@@ -365,9 +408,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('form-site').reset();
         document.getElementById('site-id').value = '';
         const baseSite = sitesData[0] || {};
-        document.getElementById('site-from-email').value = baseSite.from_email || 'no-reply@cc-circle.net';
+        document.getElementById('site-from-email').value = '';
         document.getElementById('site-from-name').value = '';
         document.getElementById('site-signature').value = baseSite.signature || "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
+        document.getElementById('site-smtp-port').value = '465';
+        document.getElementById('smtp-pass-note').textContent = '';
         document.getElementById('modal-title').textContent = 'サイトを追加';
         document.getElementById('modal-site').classList.add('open');
     });
@@ -383,9 +428,15 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('site-id').value = site.id;
             document.getElementById('site-name').value = site.name || '';
             document.getElementById('site-url').value = site.url || '';
-            document.getElementById('site-from-email').value = site.from_email || 'no-reply@cc-circle.net';
+            document.getElementById('site-from-email').value = site.from_email || '';
             document.getElementById('site-from-name').value = site.from_name || '';
             document.getElementById('site-signature').value = site.signature || '';
+            document.getElementById('site-smtp-host').value = site.smtp_host || '';
+            document.getElementById('site-smtp-port').value = site.smtp_port || '465';
+            document.getElementById('site-smtp-user').value = site.smtp_user || '';
+            document.getElementById('smtp-pass-note').textContent = site.has_smtp_pass
+                ? '※設定済み（変更する場合のみ入力）'
+                : '';
             document.getElementById('modal-title').textContent = 'サイトを編集';
             document.getElementById('modal-site').classList.add('open');
             return;
@@ -436,6 +487,38 @@ document.addEventListener('DOMContentLoaded', function() {
         const closeBtn = e.target.closest('.modal-close');
         if (closeBtn) {
             closeBtn.closest('.modal-overlay').classList.remove('open');
+        }
+    });
+
+    // テストメール送信ボタン
+    document.getElementById('btn-send-test-mail').addEventListener('click', async function() {
+        const testTo = document.getElementById('test-mail-to').value.trim();
+        if (!testTo) {
+            alert('テスト送信先のメールアドレスを入力してください。');
+            return;
+        }
+
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = '送信中...';
+
+        try {
+            const fd = new FormData(document.getElementById('form-site'));
+            fd.append('action', 'test_mail');
+            fd.append('test_to', testTo);
+
+            const res = await fetch('admin_sites_api.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.success) {
+                alert('テストメールを送信しました！\n受信トレイをご確認ください。');
+            } else {
+                alert('送信失敗：\n' + (data.error || '不明なエラー'));
+            }
+        } catch (err) {
+            alert('通信エラーが発生しました。');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'テストメール送信';
         }
     });
 

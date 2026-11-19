@@ -38,7 +38,11 @@ $default_config = [
             'url'        => '',
             'from_email' => 'no-reply@cc-circle.net',
             'from_name'  => 'サポートデスク',
-            'signature'  => $default_signature
+            'signature'  => $default_signature,
+            'smtp_host'  => '',
+            'smtp_port'  => '465',
+            'smtp_user'  => '',
+            'smtp_pass'  => ''
         ]
     ]
 ];
@@ -58,37 +62,180 @@ if (empty($config['sites']) || !is_array($config['sites'])) {
             'url'        => '',
             'from_email' => $config['from_email'] ?? 'no-reply@cc-circle.net',
             'from_name'  => $config['from_name'] ?? 'サポートデスク',
-            'signature'  => $config['signature'] ?? $default_signature
+            'signature'  => $config['signature'] ?? $default_signature,
+            'smtp_host'  => '',
+            'smtp_port'  => '465',
+            'smtp_user'  => '',
+            'smtp_pass'  => ''
         ]
     ];
 }
 
-$needs_save = false;
-foreach ($config['sites'] as &$s) {
-    if (!isset($s['from_email'])) {
-        $s['from_email'] = $config['from_email'] ?? 'no-reply@cc-circle.net';
-        $needs_save = true;
+// SMTPソケット応答読み取り
+function smtp_read_response($fp) {
+    $data = '';
+    while ($str = fgets($fp, 515)) {
+        $data .= $str;
+        if (isset($str[3]) && $str[3] === ' ') {
+            break;
+        }
     }
-    if (!isset($s['from_name'])) {
-        $s['from_name'] = $config['from_name'] ?? 'サポートデスク';
-        $needs_save = true;
-    }
-    if (!isset($s['signature'])) {
-        $s['signature'] = $config['signature'] ?? $default_signature;
-        $needs_save = true;
-    }
+    return $data;
 }
-unset($s);
 
-if ($needs_save) {
-    file_put_contents($config_file, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+// SMTPソケット送信関数（Google Workspace / ロリポップ対応）
+function send_via_smtp($to, $subject, $body, $from_email, $from_name, $smtp) {
+    $host = trim($smtp['smtp_host'] ?? '');
+    $port = (int)($smtp['smtp_port'] ?? 465);
+    $user = trim($smtp['smtp_user'] ?? '');
+    $pass = (string)($smtp['smtp_pass'] ?? '');
+
+    if ($host === '' || $user === '' || $pass === '') {
+        return ['ok' => false, 'error' => 'SMTP設定（サーバー・ユーザー名・パスワード）が不足しています。'];
+    }
+
+    $remote = ($port === 465) ? "ssl://{$host}:{$port}" : "tcp://{$host}:{$port}";
+    $context = stream_context_create([
+        'ssl' => [
+            'verify_peer'      => false,
+            'verify_peer_name' => false
+        ]
+    ]);
+
+    $fp = @stream_socket_client($remote, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $context);
+    if (!$fp) {
+        return ['ok' => false, 'error' => "SMTPサーバーに接続できませんでした ({$errstr})"];
+    }
+    stream_set_timeout($fp, 15);
+
+    $res = smtp_read_response($fp);
+    if (strpos($res, '220') !== 0) {
+        fclose($fp);
+        return ['ok' => false, 'error' => "SMTP初期応答エラー: {$res}"];
+    }
+
+    $helo_host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    fwrite($fp, "EHLO {$helo_host}\r\n");
+    $res = smtp_read_response($fp);
+    if (strpos($res, '250') !== 0) {
+        fclose($fp);
+        return ['ok' => false, 'error' => "EHLOエラー: {$res}"];
+    }
+
+    // 587番ポート等の場合はSTARTTLSで暗号化開始
+    if ($port !== 465) {
+        fwrite($fp, "STARTTLS\r\n");
+        $res = smtp_read_response($fp);
+        if (strpos($res, '220') !== 0) {
+            fclose($fp);
+            return ['ok' => false, 'error' => "STARTTLSエラー: {$res}"];
+        }
+        $crypto_method = STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT;
+        if (defined('STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT')) {
+            $crypto_method |= STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT;
+        }
+        if (!@stream_socket_enable_crypto($fp, true, $crypto_method)) {
+            fclose($fp);
+            return ['ok' => false, 'error' => 'TLS暗号化通信の確立に失敗しました。'];
+        }
+        fwrite($fp, "EHLO {$helo_host}\r\n");
+        $res = smtp_read_response($fp);
+    }
+
+    // AUTH LOGIN 認証
+    fwrite($fp, "AUTH LOGIN\r\n");
+    $res = smtp_read_response($fp);
+    if (strpos($res, '334') !== 0) {
+        fclose($fp);
+        return ['ok' => false, 'error' => "AUTH LOGINエラー: {$res}"];
+    }
+
+    fwrite($fp, base64_encode($user) . "\r\n");
+    $res = smtp_read_response($fp);
+    if (strpos($res, '334') !== 0) {
+        fclose($fp);
+        return ['ok' => false, 'error' => "SMTPユーザー名エラー: {$res}"];
+    }
+
+    fwrite($fp, base64_encode($pass) . "\r\n");
+    $res = smtp_read_response($fp);
+    if (strpos($res, '235') !== 0) {
+        fclose($fp);
+        return ['ok' => false, 'error' => "SMTP認証失敗（ユーザー名またはパスワードを確認してください）: {$res}"];
+    }
+
+    // MAIL FROM / RCPT TO
+    $envelope_from = filter_var($user, FILTER_VALIDATE_EMAIL) ? $user : $from_email;
+    fwrite($fp, "MAIL FROM:<{$envelope_from}>\r\n");
+    $res = smtp_read_response($fp);
+    if (strpos($res, '250') !== 0) {
+        fclose($fp);
+        return ['ok' => false, 'error' => "MAIL FROMエラー: {$res}"];
+    }
+
+    fwrite($fp, "RCPT TO:<{$to}>\r\n");
+    $res = smtp_read_response($fp);
+    if (strpos($res, '250') !== 0 && strpos($res, '251') !== 0) {
+        fclose($fp);
+        return ['ok' => false, 'error' => "RCPT TOエラー: {$res}"];
+    }
+
+    fwrite($fp, "DATA\r\n");
+    $res = smtp_read_response($fp);
+    if (strpos($res, '354') !== 0) {
+        fclose($fp);
+        return ['ok' => false, 'error' => "DATAエラー: {$res}"];
+    }
+
+    $encoded_name    = '=?UTF-8?B?' . base64_encode($from_name) . '?=';
+    $encoded_subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+    $normalized_body = str_replace(["\r\n", "\r"], "\n", (string)$body);
+    $encoded_body    = chunk_split(base64_encode($normalized_body));
+    $msg_id          = '<' . bin2hex(random_bytes(12)) . '@' . ($helo_host ?: 'tc-plus') . '>';
+
+    $raw_msg  = "Date: " . date('r') . "\r\n";
+    $raw_msg .= "Message-ID: {$msg_id}\r\n";
+    $raw_msg .= "From: {$encoded_name} <{$from_email}>\r\n";
+    $raw_msg .= "Reply-To: {$from_email}\r\n";
+    $raw_msg .= "To: <{$to}>\r\n";
+    $raw_msg .= "Subject: {$encoded_subject}\r\n";
+    $raw_msg .= "MIME-Version: 1.0\r\n";
+    $raw_msg .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $raw_msg .= "Content-Transfer-Encoding: base64\r\n\r\n";
+    $raw_msg .= $encoded_body . "\r\n.\r\n";
+
+    fwrite($fp, $raw_msg);
+    $res = smtp_read_response($fp);
+    fwrite($fp, "QUIT\r\n");
+    fclose($fp);
+
+    if (strpos($res, '250') !== 0) {
+        return ['ok' => false, 'error' => "メールデータ送信エラー: {$res}"];
+    }
+
+    return ['ok' => true];
 }
 
 $action = $_REQUEST['action'] ?? '';
 
 try {
     if ($action === 'list') {
-        echo json_encode(['success' => true, 'sites' => $config['sites']]);
+        $safe_sites = [];
+        foreach ($config['sites'] as $s) {
+            $safe_sites[] = [
+                'id'            => $s['id'] ?? '',
+                'name'          => $s['name'] ?? '',
+                'url'           => $s['url'] ?? '',
+                'from_email'    => $s['from_email'] ?? '',
+                'from_name'     => $s['from_name'] ?? '',
+                'signature'     => $s['signature'] ?? '',
+                'smtp_host'     => $s['smtp_host'] ?? '',
+                'smtp_port'     => $s['smtp_port'] ?? '465',
+                'smtp_user'     => $s['smtp_user'] ?? '',
+                'has_smtp_pass' => !empty($s['smtp_pass'])
+            ];
+        }
+        echo json_encode(['success' => true, 'sites' => $safe_sites]);
         exit;
     }
 
@@ -99,6 +246,10 @@ try {
         $from_email = trim($_POST['from_email'] ?? '');
         $from_name  = trim($_POST['from_name'] ?? '');
         $signature  = $_POST['signature'] ?? '';
+        $smtp_host  = trim($_POST['smtp_host'] ?? '');
+        $smtp_port  = trim($_POST['smtp_port'] ?? '465');
+        $smtp_user  = trim($_POST['smtp_user'] ?? '');
+        $smtp_pass  = (string)($_POST['smtp_pass'] ?? '');
 
         if ($name === '') {
             throw new Exception('サイト名を入力してください。');
@@ -118,7 +269,11 @@ try {
                 'url'        => $url,
                 'from_email' => $from_email,
                 'from_name'  => $from_name,
-                'signature'  => $signature
+                'signature'  => $signature,
+                'smtp_host'  => $smtp_host,
+                'smtp_port'  => $smtp_port !== '' ? $smtp_port : '465',
+                'smtp_user'  => $smtp_user,
+                'smtp_pass'  => $smtp_pass
             ];
         } else {
             $found = false;
@@ -129,6 +284,14 @@ try {
                     $s['from_email'] = $from_email;
                     $s['from_name']  = $from_name;
                     $s['signature']  = $signature;
+                    $s['smtp_host']  = $smtp_host;
+                    $s['smtp_port']  = $smtp_port !== '' ? $smtp_port : '465';
+                    $s['smtp_user']  = $smtp_user;
+                    if ($smtp_host === '') {
+                        $s['smtp_pass'] = '';
+                    } elseif ($smtp_pass !== '') {
+                        $s['smtp_pass'] = $smtp_pass;
+                    }
                     $found = true;
                     break;
                 }
@@ -145,6 +308,60 @@ try {
 
         if (file_put_contents($config_file, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) === false) {
             throw new Exception('設定ファイル（config.json）の書き込みに失敗しました。');
+        }
+
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    if ($action === 'test_mail') {
+        $id         = trim($_POST['id'] ?? '');
+        $test_to    = trim($_POST['test_to'] ?? '');
+        $from_email = trim($_POST['from_email'] ?? '');
+        $from_name  = trim($_POST['from_name'] ?? 'サポートデスク');
+        $smtp_host  = trim($_POST['smtp_host'] ?? '');
+        $smtp_port  = trim($_POST['smtp_port'] ?? '465');
+        $smtp_user  = trim($_POST['smtp_user'] ?? '');
+        $smtp_pass  = (string)($_POST['smtp_pass'] ?? '');
+
+        if (!filter_var($test_to, FILTER_VALIDATE_EMAIL)) {
+            throw new Exception('テスト送信先のメールアドレスを正しく入力してください。');
+        }
+
+        // パスワードが空欄なら保存済みのパスワードを取得
+        if ($smtp_pass === '' && $id !== '') {
+            foreach ($config['sites'] as $s) {
+                if (($s['id'] ?? '') === $id) {
+                    $smtp_pass = $s['smtp_pass'] ?? '';
+                    break;
+                }
+            }
+        }
+
+        $subject = "【TC Plus】SMTPテストメール（{$from_name}）";
+        $body    = "このメールは TC Plus のサイト管理画面から送信されたテストメールです。\n\n"
+                 . "差出人名: {$from_name}\n"
+                 . "差出人メール: {$from_email}\n"
+                 . "送信方式: " . ($smtp_host !== '' ? "SMTP認証 ({$smtp_host}:{$smtp_port})" : "サーバー標準送信") . "\n\n"
+                 . "このメールが受信トレイに届いていれば、メール設定は正常に完了しています。";
+
+        if ($smtp_host !== '') {
+            $res = send_via_smtp($test_to, $subject, $body, $from_email, $from_name, [
+                'smtp_host' => $smtp_host,
+                'smtp_port' => $smtp_port,
+                'smtp_user' => $smtp_user,
+                'smtp_pass' => $smtp_pass
+            ]);
+            if (!$res['ok']) {
+                throw new Exception($res['error']);
+            }
+        } else {
+            mb_language("Japanese");
+            mb_internal_encoding("UTF-8");
+            $headers = "From: " . mb_encode_mimeheader($from_name) . " <{$from_email}>";
+            if (!mb_send_mail($test_to, $subject, $body, $headers)) {
+                throw new Exception('サーバー標準送信に失敗しました。');
+            }
         }
 
         echo json_encode(['success' => true]);

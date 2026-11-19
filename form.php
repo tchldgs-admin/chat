@@ -146,7 +146,6 @@ if (file_exists($config_file)) {
     }
 }
 
-// ?site=〇〇 パラメータの必須チェック
 $site_param = trim($_REQUEST['site'] ?? '');
 $target_site = null;
 
@@ -224,12 +223,20 @@ $target_from_name  = !empty($target_site['from_name'])  ? $target_site['from_nam
 $target_signature  = isset($target_site['signature'])     ? $target_site['signature']  : ($config['signature'] ?? $default_signature);
 
 // --------------------------------------------------
-// 共通メール送信関数（シンプルなmb_send_mail方式）
+// SMTP対応・共通メール送信関数
 // --------------------------------------------------
-function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
-    mb_language("Japanese");
-    mb_internal_encoding("UTF-8");
+function smtp_read_response($fp) {
+    $data = '';
+    while ($str = fgets($fp, 515)) {
+        $data .= $str;
+        if (isset($str[3]) && $str[3] === ' ') {
+            break;
+        }
+    }
+    return $data;
+}
 
+function send_tc_mail($to, $subject, $body, $from_email, $from_name, $site = []) {
     $to         = trim(str_replace(["\r", "\n"], '', (string)$to));
     $from_email = trim(str_replace(["\r", "\n"], '', (string)$from_email));
     $from_name  = trim(str_replace(["\r", "\n"], ' ', (string)$from_name));
@@ -239,6 +246,92 @@ function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
         return false;
     }
 
+    $smtp_host = trim($site['smtp_host'] ?? '');
+    $smtp_port = (int)($site['smtp_port'] ?? 465);
+    $smtp_user = trim($site['smtp_user'] ?? '');
+    $smtp_pass = (string)($site['smtp_pass'] ?? '');
+
+    // SMTP設定がある場合はSMTP認証サーバー経由で直接送信
+    if ($smtp_host !== '' && $smtp_user !== '' && $smtp_pass !== '') {
+        $remote = ($smtp_port === 465) ? "ssl://{$smtp_host}:{$smtp_port}" : "tcp://{$smtp_host}:{$smtp_port}";
+        $context = stream_context_create([
+            'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]
+        ]);
+        $fp = @stream_socket_client($remote, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $context);
+        if ($fp) {
+            stream_set_timeout($fp, 15);
+            smtp_read_response($fp);
+            $helo_host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            fwrite($fp, "EHLO {$helo_host}\r\n");
+            smtp_read_response($fp);
+
+            if ($smtp_port !== 465) {
+                fwrite($fp, "STARTTLS\r\n");
+                smtp_read_response($fp);
+                $crypto = STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT;
+                if (defined('STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT')) {
+                    $crypto |= STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT;
+                }
+                @stream_socket_enable_crypto($fp, true, $crypto);
+                fwrite($fp, "EHLO {$helo_host}\r\n");
+                smtp_read_response($fp);
+            }
+
+            fwrite($fp, "AUTH LOGIN\r\n");
+            smtp_read_response($fp);
+            fwrite($fp, base64_encode($smtp_user) . "\r\n");
+            smtp_read_response($fp);
+            fwrite($fp, base64_encode($smtp_pass) . "\r\n");
+            $auth_res = smtp_read_response($fp);
+
+            if (strpos($auth_res, '235') === 0) {
+                $env_from = filter_var($smtp_user, FILTER_VALIDATE_EMAIL) ? $smtp_user : $from_email;
+                fwrite($fp, "MAIL FROM:<{$env_from}>\r\n");
+                smtp_read_response($fp);
+                fwrite($fp, "RCPT TO:<{$to}>\r\n");
+                smtp_read_response($fp);
+                fwrite($fp, "DATA\r\n");
+                smtp_read_response($fp);
+
+                $enc_name    = '=?UTF-8?B?' . base64_encode($from_name) . '?=';
+                $enc_subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+                $norm_body   = str_replace(["\r\n", "\r"], "\n", (string)$body);
+                $enc_body    = chunk_split(base64_encode($norm_body));
+                $msg_id      = '<' . bin2hex(random_bytes(12)) . '@' . ($helo_host ?: 'tc-plus') . '>';
+
+                $raw  = "Date: " . date('r') . "\r\n";
+                $raw .= "Message-ID: {$msg_id}\r\n";
+                $raw .= "From: {$enc_name} <{$from_email}>\r\n";
+                $raw .= "Reply-To: {$from_email}\r\n";
+                $raw .= "To: <{$to}>\r\n";
+                $raw .= "Subject: {$enc_subject}\r\n";
+                $raw .= "MIME-Version: 1.0\r\n";
+                $raw .= "Content-Type: text/plain; charset=UTF-8\r\n";
+                $raw .= "Content-Transfer-Encoding: base64\r\n\r\n";
+                $raw .= $enc_body . "\r\n.\r\n";
+
+                fwrite($fp, $raw);
+                $send_res = smtp_read_response($fp);
+                fwrite($fp, "QUIT\r\n");
+                fclose($fp);
+
+                if (strpos($send_res, '250') === 0) {
+                    return true;
+                }
+                error_log("SMTP Data Error: {$send_res}");
+            } else {
+                fwrite($fp, "QUIT\r\n");
+                fclose($fp);
+                error_log("SMTP Auth Error: {$auth_res}");
+            }
+        } else {
+            error_log("SMTP Connect Error: {$errstr}");
+        }
+    }
+
+    // SMTP未設定時の標準送信
+    mb_language("Japanese");
+    mb_internal_encoding("UTF-8");
     $headers = "From: " . mb_encode_mimeheader($from_name) . " <{$from_email}>";
     return mb_send_mail($to, $subject, $body, $headers);
 }
@@ -315,7 +408,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                            . "--------------------------------------------------\n\n"
                            . $target_signature;
 
-                send_tc_mail($email, $mail_subject, $mail_body, $target_from_email, $target_from_name);
+                send_tc_mail($email, $mail_subject, $mail_body, $target_from_email, $target_from_name, $target_site);
 
                 $is_submitted = true;
 

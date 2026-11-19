@@ -72,7 +72,11 @@ $default_config = [
             'url'        => '',
             'from_email' => 'no-reply@cc-circle.net',
             'from_name'  => 'サポートデスク',
-            'signature'  => $default_signature
+            'signature'  => $default_signature,
+            'smtp_host'  => '',
+            'smtp_port'  => '465',
+            'smtp_user'  => '',
+            'smtp_pass'  => ''
         ]
     ]
 ];
@@ -98,12 +102,17 @@ if (empty($config['sites']) || !is_array($config['sites'])) {
     file_put_contents($config_file, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
 
-// サイト名から該当サイトのメール設定を取得する関数
+// サイト名から該当サイトのメール・SMTP設定を取得する関数
 function get_site_mail_settings($config, $site_name) {
+    $first = $config['sites'][0] ?? [];
     $fallback = [
-        'from_email' => $config['sites'][0]['from_email'] ?? ($config['from_email'] ?? 'no-reply@cc-circle.net'),
-        'from_name'  => $config['sites'][0]['from_name'] ?? ($config['from_name'] ?? 'サポートデスク'),
-        'signature'  => $config['sites'][0]['signature'] ?? ($config['signature'] ?? '')
+        'from_email' => $first['from_email'] ?? ($config['from_email'] ?? 'no-reply@cc-circle.net'),
+        'from_name'  => $first['from_name']  ?? ($config['from_name']  ?? 'サポートデスク'),
+        'signature'  => $first['signature']  ?? ($config['signature']  ?? ''),
+        'smtp_host'  => $first['smtp_host']  ?? '',
+        'smtp_port'  => $first['smtp_port']  ?? '465',
+        'smtp_user'  => $first['smtp_user']  ?? '',
+        'smtp_pass'  => $first['smtp_pass']  ?? ''
     ];
     if (!empty($config['sites']) && is_array($config['sites'])) {
         foreach ($config['sites'] as $s) {
@@ -111,7 +120,11 @@ function get_site_mail_settings($config, $site_name) {
                 return [
                     'from_email' => !empty($s['from_email']) ? $s['from_email'] : $fallback['from_email'],
                     'from_name'  => !empty($s['from_name'])  ? $s['from_name']  : $fallback['from_name'],
-                    'signature'  => isset($s['signature'])     ? $s['signature']  : $fallback['signature']
+                    'signature'  => isset($s['signature'])     ? $s['signature']  : $fallback['signature'],
+                    'smtp_host'  => $s['smtp_host'] ?? '',
+                    'smtp_port'  => $s['smtp_port'] ?? '465',
+                    'smtp_user'  => $s['smtp_user'] ?? '',
+                    'smtp_pass'  => $s['smtp_pass'] ?? ''
                 ];
             }
         }
@@ -120,12 +133,20 @@ function get_site_mail_settings($config, $site_name) {
 }
 
 // --------------------------------------------------
-// 共通メール送信関数（シンプルなmb_send_mail方式）
+// SMTP対応・共通メール送信関数
 // --------------------------------------------------
-function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
-    mb_language("Japanese");
-    mb_internal_encoding("UTF-8");
+function smtp_read_response($fp) {
+    $data = '';
+    while ($str = fgets($fp, 515)) {
+        $data .= $str;
+        if (isset($str[3]) && $str[3] === ' ') {
+            break;
+        }
+    }
+    return $data;
+}
 
+function send_tc_mail($to, $subject, $body, $from_email, $from_name, $site = []) {
     $to         = trim(str_replace(["\r", "\n"], '', (string)$to));
     $from_email = trim(str_replace(["\r", "\n"], '', (string)$from_email));
     $from_name  = trim(str_replace(["\r", "\n"], ' ', (string)$from_name));
@@ -135,6 +156,94 @@ function send_tc_mail($to, $subject, $body, $from_email, $from_name) {
         return false;
     }
 
+    $smtp_host = trim($site['smtp_host'] ?? '');
+    $smtp_port = (int)($site['smtp_port'] ?? 465);
+    $smtp_user = trim($site['smtp_user'] ?? '');
+    $smtp_pass = (string)($site['smtp_pass'] ?? '');
+
+    // SMTP設定がある場合はSMTP認証サーバー経由で直接送信
+    if ($smtp_host !== '' && $smtp_user !== '' && $smtp_pass !== '') {
+        $remote = ($smtp_port === 465) ? "ssl://{$smtp_host}:{$smtp_port}" : "tcp://{$smtp_host}:{$smtp_port}";
+        $context = stream_context_create([
+            'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]
+        ]);
+        $fp = @stream_socket_client($remote, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $context);
+        if (!$fp) {
+            throw new Exception("SMTPサーバーに接続できませんでした ({$errstr})");
+        }
+        stream_set_timeout($fp, 15);
+        smtp_read_response($fp);
+        $helo_host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        fwrite($fp, "EHLO {$helo_host}\r\n");
+        smtp_read_response($fp);
+
+        if ($smtp_port !== 465) {
+            fwrite($fp, "STARTTLS\r\n");
+            smtp_read_response($fp);
+            $crypto = STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT;
+            if (defined('STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT')) {
+                $crypto |= STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT;
+            }
+            if (!@stream_socket_enable_crypto($fp, true, $crypto)) {
+                fclose($fp);
+                throw new Exception("TLS暗号化通信の確立に失敗しました。");
+            }
+            fwrite($fp, "EHLO {$helo_host}\r\n");
+            smtp_read_response($fp);
+        }
+
+        fwrite($fp, "AUTH LOGIN\r\n");
+        smtp_read_response($fp);
+        fwrite($fp, base64_encode($smtp_user) . "\r\n");
+        smtp_read_response($fp);
+        fwrite($fp, base64_encode($smtp_pass) . "\r\n");
+        $auth_res = smtp_read_response($fp);
+
+        if (strpos($auth_res, '235') !== 0) {
+            fwrite($fp, "QUIT\r\n");
+            fclose($fp);
+            throw new Exception("SMTP認証に失敗しました。サイト管理画面のSMTPユーザー名・パスワードを確認してください。");
+        }
+
+        $env_from = filter_var($smtp_user, FILTER_VALIDATE_EMAIL) ? $smtp_user : $from_email;
+        fwrite($fp, "MAIL FROM:<{$env_from}>\r\n");
+        smtp_read_response($fp);
+        fwrite($fp, "RCPT TO:<{$to}>\r\n");
+        smtp_read_response($fp);
+        fwrite($fp, "DATA\r\n");
+        smtp_read_response($fp);
+
+        $enc_name    = '=?UTF-8?B?' . base64_encode($from_name) . '?=';
+        $enc_subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+        $norm_body   = str_replace(["\r\n", "\r"], "\n", (string)$body);
+        $enc_body    = chunk_split(base64_encode($norm_body));
+        $msg_id      = '<' . bin2hex(random_bytes(12)) . '@' . ($helo_host ?: 'tc-plus') . '>';
+
+        $raw  = "Date: " . date('r') . "\r\n";
+        $raw .= "Message-ID: {$msg_id}\r\n";
+        $raw .= "From: {$enc_name} <{$from_email}>\r\n";
+        $raw .= "Reply-To: {$from_email}\r\n";
+        $raw .= "To: <{$to}>\r\n";
+        $raw .= "Subject: {$enc_subject}\r\n";
+        $raw .= "MIME-Version: 1.0\r\n";
+        $raw .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        $raw .= "Content-Transfer-Encoding: base64\r\n\r\n";
+        $raw .= $enc_body . "\r\n.\r\n";
+
+        fwrite($fp, $raw);
+        $send_res = smtp_read_response($fp);
+        fwrite($fp, "QUIT\r\n");
+        fclose($fp);
+
+        if (strpos($send_res, '250') !== 0) {
+            throw new Exception("SMTP送信エラー: {$send_res}");
+        }
+        return true;
+    }
+
+    // SMTP未設定時の標準送信
+    mb_language("Japanese");
+    mb_internal_encoding("UTF-8");
     $headers = "From: " . mb_encode_mimeheader($from_name) . " <{$from_email}>";
     return mb_send_mail($to, $subject, $body, $headers);
 }
@@ -291,11 +400,20 @@ try {
 
         $unanswered_count = (int)$pdo->query("SELECT COUNT(*) FROM tickets WHERE status = 11")->fetchColumn();
 
+        // フロントエンドにパスワード文字列は渡さない
+        $safe_config = $config;
+        if (!empty($safe_config['sites'])) {
+            foreach ($safe_config['sites'] as &$s) {
+                unset($s['smtp_pass']);
+            }
+            unset($s);
+        }
+
         echo json_encode([
             'success' => true,
             'tickets' => $tickets,
             'unanswered_count' => $unanswered_count,
-            'config' => $config
+            'config' => $safe_config
         ]);
         exit;
     }
@@ -373,9 +491,9 @@ try {
                        . "{$ticket_url}\n\n"
                        . $site_mail['signature'];
 
-            $mail_ok = send_tc_mail($ticket['customer_email'], $mail_subject, $mail_body, $site_mail['from_email'], $site_mail['from_name']);
+            $mail_ok = send_tc_mail($ticket['customer_email'], $mail_subject, $mail_body, $site_mail['from_email'], $site_mail['from_name'], $site_mail);
             if (!$mail_ok) {
-                throw new Exception('メッセージは保存されましたが、メール送信に失敗しました。サーバーのメール設定を確認してください。');
+                throw new Exception('メッセージは保存されましたが、メール送信に失敗しました。');
             }
         }
 
@@ -461,7 +579,7 @@ try {
                        . "{$ticket_url}\n\n"
                        . $site_mail['signature'];
 
-            $mail_ok = send_tc_mail($email, $mail_subject, $mail_body, $site_mail['from_email'], $site_mail['from_name']);
+            $mail_ok = send_tc_mail($email, $mail_subject, $mail_body, $site_mail['from_email'], $site_mail['from_name'], $site_mail);
             if (!$mail_ok) {
                 throw new Exception('チケットは作成されましたが、メール送信に失敗しました。');
             }
