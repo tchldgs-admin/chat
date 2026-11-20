@@ -102,7 +102,7 @@ $is_admin   = ($admin_role === 'admin');
         .breadcrumb { font-size: 11px; color: var(--text-sub); margin-bottom: 4px; }
         .page-title { font-size: 20px; font-weight: bold; margin-bottom: 16px; color: #2d3748; }
 
-        /* 検索ボックス（本家デザイン風） */
+        /* 検索ボックス */
         .search-box { border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 14px; }
         .search-box .content-basic { background: #fff; padding: 12px 14px; }
         .search-box .content-detail { background: #f8fafc; padding: 12px 14px; border-top: 1px dashed #cbd5e0; display: none; }
@@ -112,8 +112,8 @@ $is_admin   = ($admin_role === 'admin');
         .form-control { height: 32px; padding: 4px 10px; border: 1px solid #cbd5e0; border-radius: 3px; font-size: 12px; background: #fff; }
         .form-control:focus { outline: none; border-color: var(--primary-blue); }
         
-        .status-filters { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; font-size: 12px; }
-        .status-filters label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        .status-filters { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 12px; font-size: 12px; }
+        .status-filters label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: bold; color: #4a5568; }
         
         .search-footer { display: flex; justify-content: flex-end; align-items: center; padding: 10px 14px; background: #f8fafc; border-top: 1px solid #e2e8f0; gap: 8px; }
         .detail-toggle { color: #4a5568; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 2px; user-select: none; text-decoration: none; }
@@ -138,6 +138,66 @@ $is_admin   = ($admin_role === 'admin');
         .bulk-bar { display: none; background: #ebf8ff; grid-column: 1 / -1; align-items: center; gap: 10px; }
         .bulk-bar.active { display: flex; }
 
+        /* ステータス別セクション見出し（「一覧」画面用） */
+        .status-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 8px 8px;
+            border-bottom: 1px solid #cbd5e0;
+            background: #ffffff;
+        }
+        .status-section-header:first-child {
+            padding-top: 12px;
+        }
+        .status-section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-section-title.is-unanswered {
+            color: #e53e3e;
+        }
+        .status-section-count {
+            font-size: 12px;
+            font-weight: normal;
+            color: #718096;
+        }
+        .btn-status-list {
+            background: var(--primary-blue);
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+        .btn-status-list:hover {
+            background: #2188c4;
+        }
+
+        /* 10件超過時の3点リーダー行 */
+        .more-dots-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            color: #718096;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .more-dots-row:hover {
+            background: #f0f7ff;
+            color: var(--primary-blue);
+        }
+
         .ticket-item { border-bottom: 1px solid var(--border-color); transition: background 0.1s; }
         .ticket-item.alert-warning { background: #fefcbf; }
         .ticket-item.alert-danger { background: #fed7d7; }
@@ -154,6 +214,8 @@ $is_admin   = ($admin_role === 'admin');
         
         .col-subject { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; color: #2b6cb0; }
         .col-subject:hover .subject-text { text-decoration: underline; }
+        .expand-arrow { color: #718096; transition: transform 0.15s; }
+        .ticket-item.expanded .expand-arrow { transform: rotate(90deg); color: var(--primary-blue); }
         
         .mail-icon { color: #718096; }
         .subject-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -174,6 +236,7 @@ $is_admin   = ($admin_role === 'admin');
         
         .detail-meta-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; }
         .meta-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .meta-label { font-size: 11px; color: var(--text-sub); font-weight: bold; }
         
         .thread-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
         .event-card { background: #fff; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; }
@@ -367,12 +430,6 @@ $is_admin   = ($admin_role === 'admin');
                     <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
                         <input type="checkbox" name="unread_only" value="1"> 未読のみ
                     </label>
-                    <select name="search-rate" class="form-control" style="width:120px; margin-left:12px;" disabled>
-                        <option value="">評価</option>
-                        <option value="0">未評価</option>
-                        <option value="1">よかった</option>
-                        <option value="2">悪かった</option>
-                    </select>
                 </div>
                 <div class="search-row">
                     <input type="number" name="ticket_id" class="form-control" style="width:120px;" placeholder="チケットID">
@@ -538,6 +595,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let appConfig = {};
 
     const statusLabels = { 11: '未対応', 12: '対応中', 13: '保留中', 21: '解決済', 31: 'ゴミ箱' };
+    const statusOrder  = [11, 12, 13, 21, 31];
+    const SECTION_LIMIT = 10;
 
     const svgIcons = {
         arrowRight: '<svg class="expand-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>',
@@ -547,8 +606,8 @@ document.addEventListener('DOMContentLoaded', function() {
         support: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#29a3e5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>',
         memo: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#b7791f"><path d="M19 3H4.99c-1.11 0-1.98.9-1.98 2L3 19c0 1.1.88 2 1.99 2H15l6-6V5c0-1.1-.9-2-2-2zm-7 11H7v-2h5v2zm5-4H7V8h10v2z"/></svg>',
         trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
-        attr_tags: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#a0aec0" style="margin-left:4px;" title="タグ/カテゴリ"><path d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z"/></svg>',
-        attr_memo: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#a0aec0" style="margin-left:4px;" title="メモ"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>'
+        attr_tags: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#a0aec0" style="margin-left:4px;" title="カテゴリ設定済み"><path d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z"/></svg>',
+        moreDots: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>'
     };
 
     function esc(str) {
@@ -559,7 +618,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function apiGet(paramsObj) {
-        const params = new URLSearchParams(paramsObj);
+        const params = new URLSearchParams();
+        for (const [k, v] of Object.entries(paramsObj)) {
+            if (Array.isArray(v)) {
+                v.forEach(item => params.append(k, item));
+            } else {
+                params.append(k, v);
+            }
+        }
         const res = await fetch('admin_api.php?' + params.toString(), { cache: 'no-store' });
         if (res.status === 401) {
             window.location.replace('login.php');
@@ -585,6 +651,60 @@ document.addEventListener('DOMContentLoaded', function() {
         return await res.json();
     }
 
+    // 1行分のチケットHTMLを生成する共通関数
+    function renderTicketItem(t) {
+        const alertClass = t.alert_level ? `alert-${t.alert_level}` : '';
+        const unreadClass = (t.is_read == 0) ? 'unread' : '';
+        const assigneeText = t.assignee ? esc(t.assignee) : '<span style="color:#a0aec0;">(未割り当て)</span>';
+        const statusBadge = `<span class="status-pill st-${t.status}">${statusLabels[t.status] || ''}</span>`;
+        const attrIcons = t.category ? svgIcons.attr_tags : '';
+
+        return `
+        <div class="ticket-item ${alertClass} ${unreadClass}" data-id="${t.id}">
+            <div class="ticket-row">
+                <div class="no-expand"><input type="checkbox" class="row-check" value="${t.id}"></div>
+                <div class="no-expand"><span class="unread-dot" title="未読/既読切替" data-id="${t.id}" data-read="${t.is_read}"></span></div>
+                <div class="col-subject">
+                    ${svgIcons.arrowRight}
+                    ${svgIcons.mail}
+                    ${statusBadge}
+                    <span class="subject-text" title="${esc(t.subject)}">${esc(t.subject)}</span>
+                    ${attrIcons}
+                </div>
+                <div class="col-visitor">
+                    ${svgIcons.globe}
+                    <span>${esc(t.customer_name)}</span>
+                </div>
+                <div class="col-assignee">${assigneeText}</div>
+                <div class="col-elapsed">${esc(t.elapsed_text)}</div>
+                <div class="col-site">${esc(t.site_name)}</div>
+                <div class="col-id">${t.id}</div>
+            </div>
+            <div class="ticket-detail-panel" id="detail-panel-${t.id}">
+                <div style="color:#718096;">読み込み中...</div>
+            </div>
+        </div>`;
+    }
+
+    // 指定ステータスの個別一覧へ移動する関数
+    function navigateToStatus(statusCode) {
+        const targetLi = document.querySelector(`#side-status-menu li[data-status="${statusCode}"]`);
+        if (targetLi) {
+            document.querySelectorAll('#side-status-menu li').forEach(li => li.classList.remove('active'));
+            targetLi.classList.add('active');
+            currentStatusGroup = String(statusCode);
+            const spanText = targetLi.querySelector('span');
+            document.getElementById('current-view-title').textContent = targetLi.dataset.title || (spanText ? spanText.textContent.trim() : '');
+
+            document.querySelectorAll('.status-cb').forEach(cb => {
+                cb.checked = (cb.value === String(statusCode));
+            });
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            loadTickets();
+        }
+    }
+
     async function loadTickets() {
         const form = document.getElementById('search-form');
         const fd = new FormData(form);
@@ -598,7 +718,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // 検索パラメータの送信準備
         params.action = 'list';
         params.status_group = currentStatusGroup;
         params.sort_by = sortBy;
@@ -629,43 +748,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            container.innerHTML = res.tickets.map(t => {
-                const alertClass = t.alert_level ? `alert-${t.alert_level}` : '';
-                const unreadClass = (t.is_read == 0) ? 'unread' : '';
-                const assigneeText = t.assignee ? esc(t.assignee) : '<span style="color:#a0aec0;">(未割り当て)</span>';
-                const statusBadge = `<span class="status-pill st-${t.status}">${statusLabels[t.status] || ''}</span>`;
+            // 「一覧」モードのときはステータスごとのセクションに分けて最大10件＋3点リーダー表示
+            if (currentStatusGroup === 'active') {
+                const selectedStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => Number(cb.value));
+                const targetStatuses = selectedStatuses.length > 0 ? selectedStatuses : [11, 12, 13];
 
-                let attrIcons = '';
-                if (t.category) {
-                    attrIcons += svgIcons.attr_tags;
-                }
-                
-                return `
-                <div class="ticket-item ${alertClass} ${unreadClass}" data-id="${t.id}">
-                    <div class="ticket-row">
-                        <div class="no-expand"><input type="checkbox" class="row-check" value="${t.id}"></div>
-                        <div class="no-expand"><span class="unread-dot" title="未読/既読切替" data-id="${t.id}" data-read="${t.is_read}"></span></div>
-                        <div class="col-subject">
-                            ${svgIcons.arrowRight}
-                            ${svgIcons.mail}
-                            ${statusBadge}
-                            <span class="subject-text" title="${esc(t.subject)}">${esc(t.subject)}</span>
-                            ${attrIcons}
-                        </div>
-                        <div class="col-visitor">
-                            ${svgIcons.globe}
-                            <span>${esc(t.customer_name)}</span>
-                        </div>
-                        <div class="col-assignee">${assigneeText}</div>
-                        <div class="col-elapsed">${esc(t.elapsed_text)}</div>
-                        <div class="col-site">${esc(t.site_name)}</div>
-                        <div class="col-id">${t.id}</div>
-                    </div>
-                    <div class="ticket-detail-panel" id="detail-panel-${t.id}">
-                        <div style="color:#718096;">読み込み中...</div>
-                    </div>
-                </div>`;
-            }).join('');
+                let html = '';
+                statusOrder.forEach(st => {
+                    if (!targetStatuses.includes(st)) return;
+                    const groupTickets = res.tickets.filter(t => Number(t.status) === st);
+                    if (groupTickets.length === 0) return;
+
+                    const titleClass = (st === 11) ? 'status-section-title is-unanswered' : 'status-section-title';
+                    const visibleTickets = groupTickets.slice(0, SECTION_LIMIT);
+                    const hasMore = groupTickets.length > SECTION_LIMIT;
+
+                    html += `
+                    <div class="status-section-header">
+                        <h2 class="${titleClass}">
+                            <span>${esc(statusLabels[st])}</span>
+                            <span class="status-section-count">(${groupTickets.length}件)</span>
+                        </h2>
+                        <button type="button" class="btn-status-list btn-go-status" data-status="${st}">${esc(statusLabels[st])}一覧</button>
+                    </div>`;
+
+                    html += visibleTickets.map(renderTicketItem).join('');
+
+                    if (hasMore) {
+                        html += `
+                        <div class="more-dots-row btn-go-status" data-status="${st}" title="${esc(statusLabels[st])}一覧をすべて表示（残り${groupTickets.length - SECTION_LIMIT}件）">
+                            ${svgIcons.moreDots}
+                        </div>`;
+                    }
+                });
+
+                container.innerHTML = html || '<div style="padding:40px; text-align:center; color:#718096;">該当するチケットはありません</div>';
+            } else {
+                // 個別ステータス一覧では全件をそのまま表示
+                container.innerHTML = res.tickets.map(renderTicketItem).join('');
+            }
 
             updateBulkBar();
         } catch (err) {
@@ -806,6 +927,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     document.addEventListener('click', async function(e) {
+        // 各セクションの「〇〇一覧」ボタン or 「3点リーダー」クリック
+        const goStatusBtn = e.target.closest('.btn-go-status');
+        if (goStatusBtn) {
+            e.preventDefault();
+            navigateToStatus(goStatusBtn.dataset.status);
+            return;
+        }
+
         const row = e.target.closest('.ticket-row');
         if (row && !e.target.closest('.no-expand')) {
             const item = row.closest('.ticket-item');
@@ -920,7 +1049,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const spanText = sideItem.querySelector('span');
             document.getElementById('current-view-title').textContent = sideItem.dataset.title || (spanText ? spanText.textContent.trim() : '');
             
-            // ステータス絞り込みチェックボックスの同期
             document.querySelectorAll('.status-cb').forEach(cb => {
                 if (currentStatusGroup === 'active') {
                     cb.checked = ['11', '12', '13'].includes(cb.value);
@@ -970,7 +1098,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.row-check').forEach(cb => cb.checked = e.target.checked);
             updateBulkBar();
         } else if (e.target.id === 'check-all-bulk') {
-            // 一括操作バー側のチェックを外すと全解除して元のヘッダーに戻す
             if (!e.target.checked) {
                 document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
                 document.getElementById('check-all').checked = false;
@@ -1001,7 +1128,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('check-all').checked = false;
             loadTickets();
         } else if (e.target.id === 'bulk-category-select') {
-            // valueが空文字列の場合は「未設定」として更新する（先頭の案内用option以外）
             if (e.target.selectedIndex === 0) return;
             const val = e.target.value;
             const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
@@ -1031,13 +1157,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('search-form').addEventListener('submit', function(e) {
         e.preventDefault();
+
+        const checkedStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
+        if (checkedStatuses.length === 0) {
+            document.querySelectorAll('.status-cb').forEach(cb => {
+                cb.checked = ['11', '12', '13'].includes(cb.value);
+            });
+        }
+
+        // 個別ステータス画面表示中に「詳細」で複数ステータス等を変更して検索した場合は「一覧」へ切り替える
+        if (currentStatusGroup !== 'active') {
+            const isDifferentFromSingle = !(checkedStatuses.length === 1 && checkedStatuses[0] === currentStatusGroup);
+            if (isDifferentFromSingle) {
+                document.querySelectorAll('#side-status-menu li').forEach(li => li.classList.remove('active'));
+                const listMenu = document.querySelector('#side-status-menu li[data-status="active"]');
+                if (listMenu) listMenu.classList.add('active');
+                currentStatusGroup = 'active';
+                document.getElementById('current-view-title').textContent = '一覧';
+            }
+        }
+
         loadTickets();
     });
     
     document.getElementById('btn-reset-search').addEventListener('click', function() {
         document.getElementById('search-form').reset();
         
-        // サイドバーと連動しているステータスをリセット
         document.querySelectorAll('.status-cb').forEach(cb => {
             if (currentStatusGroup === 'active') {
                 cb.checked = ['11', '12', '13'].includes(cb.value);

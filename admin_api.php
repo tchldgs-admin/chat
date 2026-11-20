@@ -161,7 +161,6 @@ function send_tc_mail($to, $subject, $body, $from_email, $from_name, $site = [])
     $smtp_user = trim($site['smtp_user'] ?? '');
     $smtp_pass = (string)($site['smtp_pass'] ?? '');
 
-    // SMTP設定がある場合はSMTP認証サーバー経由で直接送信
     if ($smtp_host !== '' && $smtp_user !== '' && $smtp_pass !== '') {
         $remote = ($smtp_port === 465) ? "ssl://{$smtp_host}:{$smtp_port}" : "tcp://{$smtp_host}:{$smtp_port}";
         $context = stream_context_create([
@@ -241,7 +240,6 @@ function send_tc_mail($to, $subject, $body, $from_email, $from_name, $site = [])
         return true;
     }
 
-    // SMTP未設定時の標準送信
     mb_language("Japanese");
     mb_internal_encoding("UTF-8");
     $headers = "From: " . mb_encode_mimeheader($from_name) . " <{$from_email}>";
@@ -318,7 +316,19 @@ try {
 
         $status_filter = $_GET['status_group'] ?? 'active';
         if ($status_filter === 'active') {
-            $where[] = "status IN (11, 12, 13)";
+            $req_statuses = $_GET['search-status'] ?? [11, 12, 13];
+            if (!is_array($req_statuses)) {
+                $req_statuses = [$req_statuses];
+            }
+            $valid_statuses = array_values(array_intersect(array_map('intval', $req_statuses), [11, 12, 13, 21, 31]));
+            if (empty($valid_statuses)) {
+                $valid_statuses = [11, 12, 13];
+            }
+            $in_placeholders = implode(',', array_fill(0, count($valid_statuses), '?'));
+            $where[] = "status IN ({$in_placeholders})";
+            foreach ($valid_statuses as $st) {
+                $params[] = $st;
+            }
         } elseif ($status_filter !== 'all' && is_numeric($status_filter)) {
             $where[] = "status = ?";
             $params[] = (int)$status_filter;
@@ -400,7 +410,6 @@ try {
 
         $unanswered_count = (int)$pdo->query("SELECT COUNT(*) FROM tickets WHERE status = 11")->fetchColumn();
 
-        // フロントエンドにパスワード文字列は渡さない
         $safe_config = $config;
         if (!empty($safe_config['sites'])) {
             foreach ($safe_config['sites'] as &$s) {
