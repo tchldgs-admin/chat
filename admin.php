@@ -54,6 +54,7 @@ $is_admin   = ($admin_role === 'admin');
             --border-color: #e2e8f0;
             --text-main: #333333;
             --text-sub: #718096;
+            --bg-light: #f7fafc;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; color: var(--text-main); background: #ffffff; font-size: 13px; }
@@ -89,7 +90,7 @@ $is_admin   = ($admin_role === 'admin');
         .side-menu li a:hover { background: #e8edf3; }
         .side-menu li.active a { background: #e2ecf7; color: #1a365d; font-weight: bold; border-left: 3px solid var(--primary-blue); }
         .side-menu svg { color: #718096; }
-        .side-menu li.status-11 svg { color: #29a3e5; }
+        .side-menu li.active svg { color: #29a3e5; }
         .side-divider { border: none; border-top: 1px solid #dce3ec; margin: 12px 14px; }
         .side-buttons { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
         .btn-navy { background: var(--navy-btn); color: #fff; border: none; padding: 9px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
@@ -97,18 +98,26 @@ $is_admin   = ($admin_role === 'admin');
         .side-group-title { font-size: 11px; color: #a0aec0; font-weight: bold; padding: 0 18px; margin-bottom: 4px; margin-top: 16px; }
 
         /* メインコンテンツ */
-        .main-content { flex: 1; margin-left: 185px; padding: 20px 28px; }
+        .main-content { flex: 1; margin-left: 185px; padding: 20px 28px; background: #fff; }
         .breadcrumb { font-size: 11px; color: var(--text-sub); margin-bottom: 4px; }
         .page-title { font-size: 20px; font-weight: bold; margin-bottom: 16px; color: #2d3748; }
 
-        /* 検索ボックス */
-        .search-box { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px 14px; margin-bottom: 14px; }
+        /* 検索ボックス（本家デザイン風） */
+        .search-box { border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 14px; }
+        .search-box .content-basic { background: #fff; padding: 12px 14px; }
+        .search-box .content-detail { background: #f8fafc; padding: 12px 14px; border-top: 1px dashed #cbd5e0; display: none; }
+        .search-box.detail_shown .content-detail { display: block; }
+        
         .search-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .form-control { height: 32px; padding: 4px 10px; border: 1px solid #cbd5e0; border-radius: 3px; font-size: 12px; background: #fff; }
         .form-control:focus { outline: none; border-color: var(--primary-blue); }
-        .search-detail-area { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e0; gap: 12px; align-items: center; }
-        .search-detail-area.open { display: flex; flex-wrap: wrap; }
-        .detail-toggle { color: #4a5568; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 2px; user-select: none; }
+        
+        .status-filters { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; font-size: 12px; }
+        .status-filters label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        
+        .search-footer { display: flex; justify-content: flex-end; align-items: center; padding: 10px 14px; background: #f8fafc; border-top: 1px solid #e2e8f0; gap: 8px; }
+        .detail-toggle { color: #4a5568; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 2px; user-select: none; text-decoration: none; }
+        .detail-toggle:hover { text-decoration: underline; }
         .btn-search { background: var(--navy-btn); color: #fff; border: none; height: 32px; padding: 0 14px; border-radius: 3px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
         .btn-clear { background: #fff; color: #4a5568; border: 1px solid #cbd5e0; height: 32px; width: 32px; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 
@@ -117,25 +126,35 @@ $is_admin   = ($admin_role === 'admin');
 
         /* チケット一覧テーブル */
         .ticket-table-wrap { border-top: 1px solid var(--border-color); }
-        .ticket-header-row { display: grid; grid-template-columns: 34px 28px 1fr 170px 140px 150px 110px 80px; align-items: center; background: #f8fafc; border-bottom: 1px solid var(--border-color); padding: 9px 8px; font-weight: bold; color: #4a5568; font-size: 12px; }
+        
+        .ticket-header-row { 
+            display: grid; grid-template-columns: 34px 28px 1fr 150px 120px 100px 120px 90px; 
+            align-items: center; background: #f8fafc; border-bottom: 1px solid var(--border-color); 
+            padding: 9px 8px; font-weight: bold; color: #4a5568; font-size: 12px; 
+        }
         .sort-col { cursor: pointer; display: flex; align-items: center; gap: 2px; user-select: none; }
         .sort-col:hover { color: var(--primary-blue); }
 
-        .bulk-bar { display: none; background: #ebf8ff; border-bottom: 1px solid #bee3f8; padding: 7px 12px; align-items: center; gap: 10px; }
+        .bulk-bar { display: none; background: #ebf8ff; grid-column: 1 / -1; align-items: center; gap: 10px; }
         .bulk-bar.active { display: flex; }
 
         .ticket-item { border-bottom: 1px solid var(--border-color); transition: background 0.1s; }
         .ticket-item.alert-warning { background: #fefcbf; }
         .ticket-item.alert-danger { background: #fed7d7; }
-        .ticket-row { display: grid; grid-template-columns: 34px 28px 1fr 170px 140px 150px 110px 80px; align-items: center; padding: 10px 8px; cursor: pointer; }
+        .ticket-row { 
+            display: grid; grid-template-columns: 34px 28px 1fr 150px 120px 100px 120px 90px; 
+            align-items: center; padding: 10px 8px; cursor: pointer; 
+        }
         .ticket-row:hover { background: rgba(41, 163, 229, 0.08); }
-        .ticket-row:hover .subject-text { text-decoration: underline; }
+        .ticket-item.expanded .ticket-row { background: #edf2f7; font-weight: bold; }
+        
         .ticket-item.unread .col-subject { font-weight: bold; }
         .unread-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: transparent; cursor: pointer; }
         .ticket-item.unread .unread-dot { background: var(--primary-blue); }
+        
         .col-subject { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; color: #2b6cb0; }
-        .expand-arrow { color: #718096; transition: transform 0.15s; }
-        .ticket-item.expanded .expand-arrow { transform: rotate(90deg); color: var(--primary-blue); }
+        .col-subject:hover .subject-text { text-decoration: underline; }
+        
         .mail-icon { color: #718096; }
         .subject-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .col-visitor { display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
@@ -149,14 +168,13 @@ $is_admin   = ($admin_role === 'admin');
         .st-21 { background: #38a169; }
         .st-31 { background: #718096; }
 
-        /* スレッド詳細 */
+        /* スレッド詳細（本家風インライン展開） */
         .ticket-detail-panel { display: none; background: #f9fbfd; border-top: 1px solid #cbd5e0; padding: 18px 24px 24px 42px; }
         .ticket-item.expanded .ticket-detail-panel { display: block; }
-        .ticket-item.expanded .ticket-row { background: #edf2f7; font-weight: bold; }
-        .detail-meta-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: #fff; border: 1px solid var(--border-color); border-radius: 4px; padding: 10px 14px; margin-bottom: 14px; gap: 10px; }
+        
+        .detail-meta-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; }
         .meta-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .meta-label { font-size: 11px; color: var(--text-sub); font-weight: bold; }
-
+        
         .thread-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
         .event-card { background: #fff; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; }
         .event-card.memo { background: #fefcbf; border-color: #f6e05e; }
@@ -312,30 +330,57 @@ $is_admin   = ($admin_role === 'admin');
 
         <!-- 検索フォーム -->
         <form id="search-form" class="search-box">
-            <div class="search-row">
-                <input type="date" name="start_date" class="form-control" title="開始日">
-                <span>〜</span>
-                <input type="date" name="end_date" class="form-control" title="終了日">
+            <div class="content-basic">
+                <div class="search-row">
+                    <div style="display:flex; align-items:center; gap:4px;">
+                        <input type="date" name="start_date" class="form-control" title="作成日 始点">
+                        <span>〜</span>
+                        <input type="date" name="end_date" class="form-control" title="作成日 終点">
+                    </div>
 
-                <select name="site_name" id="filter-site" class="form-control">
-                    <option value="">サイト</option>
-                </select>
+                    <select name="site_name" id="filter-site" class="form-control" style="width:140px;">
+                        <option value="">サイト</option>
+                    </select>
 
-                <select name="assignee" id="filter-assignee" class="form-control">
-                    <option value="">担当者</option>
-                    <option value="unassigned">(未割り当て)</option>
-                </select>
+                    <select name="assignee" id="filter-assignee" class="form-control" style="width:140px;">
+                        <option value="">担当者</option>
+                        <option value="unassigned">(未割り当て)</option>
+                    </select>
 
-                <select name="category" id="filter-category" class="form-control">
-                    <option value="">カテゴリ</option>
-                </select>
+                    <select name="category" id="filter-category" class="form-control" style="width:140px;">
+                        <option value="">カテゴリ</option>
+                    </select>
 
-                <input type="text" name="word" class="form-control" style="width:200px;" placeholder="フリーワード検索">
+                    <input type="text" name="word" class="form-control" style="width:200px;" placeholder="フリーワード検索">
+                </div>
+            </div>
+            
+            <div class="content-detail" id="search-detail-area">
+                <div class="status-filters">
+                    <label><input type="checkbox" name="search-status[]" value="11" class="status-cb" checked> 未対応</label>
+                    <label><input type="checkbox" name="search-status[]" value="12" class="status-cb" checked> 対応中</label>
+                    <label><input type="checkbox" name="search-status[]" value="13" class="status-cb" checked> 保留中</label>
+                    <label><input type="checkbox" name="search-status[]" value="21" class="status-cb"> 解決済</label>
+                    <label><input type="checkbox" name="search-status[]" value="31" class="status-cb"> ゴミ箱</label>
+                </div>
+                <div class="search-row" style="margin-bottom:12px;">
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+                        <input type="checkbox" name="unread_only" value="1"> 未読のみ
+                    </label>
+                    <select name="search-rate" class="form-control" style="width:120px; margin-left:12px;" disabled>
+                        <option value="">評価</option>
+                        <option value="0">未評価</option>
+                        <option value="1">よかった</option>
+                        <option value="2">悪かった</option>
+                    </select>
+                </div>
+                <div class="search-row">
+                    <input type="number" name="ticket_id" class="form-control" style="width:120px;" placeholder="チケットID">
+                </div>
+            </div>
 
-                <span class="detail-toggle" id="toggle-search-detail">
-                    詳細 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
-                </span>
-
+            <div class="search-footer">
+                <a id="toggle-search-detail" class="detail-toggle">詳細 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></a>
                 <button type="submit" class="btn-search">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                     <span>検索</span>
@@ -344,44 +389,20 @@ $is_admin   = ($admin_role === 'admin');
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                 </button>
             </div>
-
-            <div class="search-detail-area" id="search-detail-area">
-                <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
-                    <input type="checkbox" name="unread_only" value="1"> 未読のみ
-                </label>
-                <div>
-                    <input type="number" name="ticket_id" class="form-control" style="width:120px;" placeholder="チケットID">
-                </div>
-            </div>
         </form>
 
         <!-- 件数表示 & CSV -->
         <div class="list-toolbar">
-            <span id="result-count-text">0 件中 0 〜 0</span>
+            <span id="result-count-text">0 件</span>
             <a href="admin_api.php?action=export_csv" class="btn-navy" style="padding:5px 12px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                 <span>CSVダウンロード</span>
             </a>
         </div>
 
-        <!-- チケット一覧 -->
+        <!-- チケット一覧テーブル -->
         <div class="ticket-table-wrap">
-            <div class="bulk-bar" id="bulk-action-bar">
-                <span id="bulk-selected-count" style="font-weight:bold; color:#2b6cb0;">0件選択中</span>
-                <select id="bulk-status-select" class="form-control">
-                    <option value="">ステータスを変更...</option>
-                    <option value="11">未対応</option>
-                    <option value="12">対応中</option>
-                    <option value="13">保留中</option>
-                    <option value="21">解決済</option>
-                    <option value="31">ゴミ箱</option>
-                </select>
-                <select id="bulk-assignee-select" class="form-control">
-                    <option value="">担当者を変更...</option>
-                </select>
-            </div>
-
-            <div class="ticket-header-row">
+            <div class="ticket-header-row" id="ticket-header-normal">
                 <div><input type="checkbox" id="check-all"></div>
                 <div></div>
                 <div class="sort-col" data-sort="subject">件名 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></div>
@@ -390,6 +411,30 @@ $is_admin   = ($admin_role === 'admin');
                 <div class="sort-col" data-sort="elapsed">経過時間 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></div>
                 <div>サイト名</div>
                 <div class="sort-col" data-sort="ticket-id" style="justify-content:flex-end;">チケットID <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></div>
+            </div>
+            
+            <div class="ticket-header-row bulk-bar" id="bulk-action-bar">
+                <div><input type="checkbox" id="check-all-bulk" checked></div>
+                <span id="bulk-selected-count" style="font-weight:bold; color:#2b6cb0; font-size:13px; margin-left:10px;">0件選択中</span>
+                <select id="bulk-status-select" class="form-control" style="width:150px; margin-left:14px;">
+                    <option value="">ステータスを変更...</option>
+                    <option value="11">未対応</option>
+                    <option value="12">対応中</option>
+                    <option value="13">保留中</option>
+                    <option value="21">解決済</option>
+                    <option value="31">ゴミ箱</option>
+                </select>
+                <select id="bulk-assignee-select" class="form-control" style="width:150px;">
+                    <option value="">担当者を変更...</option>
+                </select>
+                <select id="bulk-read-select" class="form-control" style="width:180px;">
+                    <option value="">未読/既読状態を変更...</option>
+                    <option value="1">既読にする</option>
+                    <option value="0">未読にする</option>
+                </select>
+                <select id="bulk-category-select" class="form-control" style="width:150px;">
+                    <option value="">カテゴリを変更...</option>
+                </select>
             </div>
 
             <div id="ticket-list-container"></div>
@@ -501,7 +546,9 @@ document.addEventListener('DOMContentLoaded', function() {
         person: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#718096"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>',
         support: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#29a3e5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>',
         memo: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#b7791f"><path d="M19 3H4.99c-1.11 0-1.98.9-1.98 2L3 19c0 1.1.88 2 1.99 2H15l6-6V5c0-1.1-.9-2-2-2zm-7 11H7v-2h5v2zm5-4H7V8h10v2z"/></svg>',
-        trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>'
+        trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
+        attr_tags: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#a0aec0" style="margin-left:4px;" title="タグ/カテゴリ"><path d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z"/></svg>',
+        attr_memo: '<svg width="16" height="16" viewBox="0 0 24 24" fill="#a0aec0" style="margin-left:4px;" title="メモ"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>'
     };
 
     function esc(str) {
@@ -542,7 +589,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('search-form');
         const fd = new FormData(form);
         const params = {};
-        fd.forEach((value, key) => { params[key] = value; });
+        fd.forEach((value, key) => { 
+            if (key === 'search-status[]') {
+                if (!params[key]) params[key] = [];
+                params[key].push(value);
+            } else {
+                params[key] = value; 
+            }
+        });
+        
+        // 検索パラメータの送信準備
         params.action = 'list';
         params.status_group = currentStatusGroup;
         params.sort_by = sortBy;
@@ -564,7 +620,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const total = res.tickets.length;
-            document.getElementById('result-count-text').textContent = total > 0 ? `${total} 件中 1 〜 ${total}` : '0 件';
+            document.getElementById('result-count-text').textContent = total > 0 ? `${total} 件` : '0 件';
 
             const container = document.getElementById('ticket-list-container');
             if (total === 0) {
@@ -579,6 +635,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const assigneeText = t.assignee ? esc(t.assignee) : '<span style="color:#a0aec0;">(未割り当て)</span>';
                 const statusBadge = `<span class="status-pill st-${t.status}">${statusLabels[t.status] || ''}</span>`;
 
+                let attrIcons = '';
+                if (t.category) {
+                    attrIcons += svgIcons.attr_tags;
+                }
+                
                 return `
                 <div class="ticket-item ${alertClass} ${unreadClass}" data-id="${t.id}">
                     <div class="ticket-row">
@@ -588,7 +649,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             ${svgIcons.arrowRight}
                             ${svgIcons.mail}
                             ${statusBadge}
-                            <span class="subject-text">${esc(t.subject)}</span>
+                            <span class="subject-text" title="${esc(t.subject)}">${esc(t.subject)}</span>
+                            ${attrIcons}
                         </div>
                         <div class="col-visitor">
                             ${svgIcons.globe}
@@ -636,6 +698,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         document.getElementById('bulk-assignee-select').innerHTML = '<option value="">担当者を変更...</option>' +
             agents.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+
+        document.getElementById('bulk-category-select').innerHTML = '<option value="">カテゴリを変更...</option><option value="">(カテゴリなし)</option>' +
+            cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 
         document.getElementById('create-site').innerHTML =
             sites.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
@@ -696,11 +761,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="meta-group">
                         <span class="meta-label">サイト:</span>
                         <span style="font-weight:bold; color:#2d3748;">${esc(t.site_name)}</span>
-                        <span class="meta-label">担当者:</span>
+                        <span class="meta-label" style="margin-left:10px;">担当者:</span>
                         <select class="form-control inline-update" data-id="${t.id}" data-field="assignee">${agentOpts}</select>
-                        <span class="meta-label">カテゴリ:</span>
+                        <span class="meta-label" style="margin-left:10px;">カテゴリ:</span>
                         <select class="form-control inline-update" data-id="${t.id}" data-field="category">${catOpts}</select>
-                        <a href="view.php?id=${t.id}&key=${esc(t.secret_key)}" target="_blank" style="font-size:12px; color:#2b6cb0;">お客様用確認ページ ↗</a>
+                        <a href="view.php?id=${t.id}&key=${esc(t.secret_key)}" target="_blank" style="font-size:12px; color:#2b6cb0; margin-left:10px;">お客様用確認ページ ↗</a>
                     </div>
                     <div>
                         <button type="button" class="btn-update-only btn-trash-ticket" data-id="${t.id}" style="color:#e53e3e;">
@@ -854,6 +919,18 @@ document.addEventListener('DOMContentLoaded', function() {
             currentStatusGroup = sideItem.dataset.status;
             const spanText = sideItem.querySelector('span');
             document.getElementById('current-view-title').textContent = sideItem.dataset.title || (spanText ? spanText.textContent.trim() : '');
+            
+            // ステータス絞り込みチェックボックスの同期
+            document.querySelectorAll('.status-cb').forEach(cb => {
+                if (currentStatusGroup === 'active') {
+                    cb.checked = ['11', '12', '13'].includes(cb.value);
+                } else if (currentStatusGroup === 'all') {
+                    cb.checked = true;
+                } else {
+                    cb.checked = (cb.value === currentStatusGroup);
+                }
+            });
+            
             loadTickets();
             return;
         }
@@ -892,6 +969,13 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (e.target.id === 'check-all') {
             document.querySelectorAll('.row-check').forEach(cb => cb.checked = e.target.checked);
             updateBulkBar();
+        } else if (e.target.id === 'check-all-bulk') {
+            // 一括操作バー側のチェックを外すと全解除して元のヘッダーに戻す
+            if (!e.target.checked) {
+                document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
+                document.getElementById('check-all').checked = false;
+                updateBulkBar();
+            }
         } else if (e.target.id === 'bulk-status-select') {
             const val = e.target.value;
             if (!val) return;
@@ -908,17 +992,40 @@ document.addEventListener('DOMContentLoaded', function() {
             e.target.value = '';
             document.getElementById('check-all').checked = false;
             loadTickets();
+        } else if (e.target.id === 'bulk-read-select') {
+            const val = e.target.value;
+            if (!val) return;
+            const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
+            await apiPost({ action: 'update_ticket', ticket_ids: ids, field: 'is_read', value: val });
+            e.target.value = '';
+            document.getElementById('check-all').checked = false;
+            loadTickets();
+        } else if (e.target.id === 'bulk-category-select') {
+            // valueが空文字列の場合は「未設定」として更新する（先頭の案内用option以外）
+            if (e.target.selectedIndex === 0) return;
+            const val = e.target.value;
+            const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
+            await apiPost({ action: 'update_ticket', ticket_ids: ids, field: 'category', value: val });
+            e.target.selectedIndex = 0;
+            document.getElementById('check-all').checked = false;
+            loadTickets();
         }
     });
 
     function updateBulkBar() {
         const count = document.querySelectorAll('.row-check:checked').length;
-        const bar = document.getElementById('bulk-action-bar');
+        const bulkBar = document.getElementById('bulk-action-bar');
+        const normalHeader = document.getElementById('ticket-header-normal');
+        
         if (count > 0) {
             document.getElementById('bulk-selected-count').textContent = `${count}件選択中`;
-            bar.classList.add('active');
+            bulkBar.classList.add('active');
+            normalHeader.style.display = 'none';
+            document.getElementById('check-all-bulk').checked = true;
         } else {
-            bar.classList.remove('active');
+            bulkBar.classList.remove('active');
+            normalHeader.style.display = 'grid';
+            document.getElementById('check-all').checked = false;
         }
     }
 
@@ -926,18 +1033,39 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         loadTickets();
     });
+    
     document.getElementById('btn-reset-search').addEventListener('click', function() {
         document.getElementById('search-form').reset();
+        
+        // サイドバーと連動しているステータスをリセット
+        document.querySelectorAll('.status-cb').forEach(cb => {
+            if (currentStatusGroup === 'active') {
+                cb.checked = ['11', '12', '13'].includes(cb.value);
+            } else if (currentStatusGroup === 'all') {
+                cb.checked = true;
+            } else {
+                cb.checked = (cb.value === currentStatusGroup);
+            }
+        });
+        
         loadTickets();
     });
-    document.getElementById('toggle-search-detail').addEventListener('click', function() {
-        document.getElementById('search-detail-area').classList.toggle('open');
+    
+    document.getElementById('toggle-search-detail').addEventListener('click', function(e) {
+        e.preventDefault();
+        const searchBox = document.querySelector('.search-box');
+        searchBox.classList.toggle('detail_shown');
+        const icon = searchBox.classList.contains('detail_shown') ? 
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg>' : 
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>';
+        this.innerHTML = `詳細 ${icon}`;
     });
 
     document.getElementById('btn-open-create').addEventListener('click', function() {
         document.getElementById('form-create-ticket').reset();
         document.getElementById('modal-create').classList.add('open');
     });
+    
     document.getElementById('form-create-ticket').addEventListener('submit', async function(e) {
         e.preventDefault();
         const fd = new FormData(this);
