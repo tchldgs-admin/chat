@@ -123,11 +123,12 @@ if (isset($_GET['captcha_img'])) {
 $config_file = __DIR__ . '/config.json';
 $default_signature = "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
 $default_config = [
-    'from_email' => 'no-reply@cc-circle.net',
-    'from_name'  => 'サポートデスク',
-    'signature'  => $default_signature,
-    'site_name'  => 'メインサイト',
-    'sites'      => [
+    'maintenance_mode' => false,
+    'from_email'       => 'no-reply@cc-circle.net',
+    'from_name'        => 'サポートデスク',
+    'signature'        => $default_signature,
+    'site_name'        => 'メインサイト',
+    'sites'            => [
         [
             'id'         => 'default',
             'name'       => 'メインサイト',
@@ -145,6 +146,8 @@ if (file_exists($config_file)) {
         $config = array_merge($default_config, $loaded);
     }
 }
+
+$is_maintenance = !empty($config['maintenance_mode']);
 
 $site_param = trim($_REQUEST['site'] ?? '');
 $target_site = null;
@@ -341,7 +344,7 @@ $error_message = '';
 $ticket_url = '';
 
 // --------------------------------------------------
-// フォームが送信されたときの処理
+// フォームが送信されたときの処理（メンテナンス中は受け付けない）
 // --------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name          = trim($_POST['customer_name'] ?? '');
@@ -352,7 +355,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $captcha_token = trim($_POST['captcha_token'] ?? '');
     $captcha_input = strtoupper(trim($_POST['captcha_code'] ?? ''));
 
-    if ($honeypot !== '') {
+    if ($is_maintenance) {
+        $error_message = '現在メンテナンス中のため、お問い合わせを受け付けることができません。';
+    } elseif ($honeypot !== '') {
         $error_message = '不正な送信が検出されました。';
     } else {
         $decoded = decode_captcha_token($captcha_token, $captcha_secret);
@@ -483,6 +488,11 @@ $form_action = 'form.php?site=' . urlencode($site_param);
         .complete-box h2 { color: #2b6cb0; margin-top: 0; font-size: 20px; }
         .url-box { background: #fff; padding: 12px; border: 1px solid #cbd5e0; border-radius: 4px; word-break: break-all; margin: 16px 0; font-size: 14px; }
         .btn-another { display: inline-block; margin-top: 12px; font-size: 13px; color: #2b6cb0; text-decoration: underline; }
+        .maintenance-notice {
+            background: #fffaf0; border: 1px solid #fbd38d; color: #9c4221;
+            padding: 24px 20px; border-radius: 6px; font-size: 14px; line-height: 1.7; text-align: center;
+        }
+        .maintenance-notice strong { display: block; font-size: 17px; margin-bottom: 8px; color: #7b341e; }
     </style>
 </head>
 <body>
@@ -498,6 +508,12 @@ $form_action = 'form.php?site=' . urlencode($site_param);
                 </a>
             </div>
             <a href="<?php echo htmlspecialchars($form_action, ENT_QUOTES, 'UTF-8'); ?>" class="btn-another">別のお問い合わせを送る</a>
+        </div>
+    <?php elseif ($is_maintenance): ?>
+        <div class="maintenance-notice">
+            <strong>現在メンテナンス中です</strong>
+            ただいまシステムメンテナンスを実施しているため、新規お問い合わせの受付を一時休止しております。<br>
+            ご不便をおかけいたしますが、メンテナンス終了後に改めてご利用くださいますようお願いいたします。
         </div>
     <?php else: ?>
         <?php if ($error_message): ?>
