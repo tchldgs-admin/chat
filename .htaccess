@@ -5,3 +5,8 @@ Options -Indexes
 <Files "config.json">
     Require all denied
 </Files>
+
+# その他ドットファイル（.htaccess等）やバックアップ・設定ファイルへの直接アクセスを禁止
+<FilesMatch "(^\.|~$|\.(bak|sql|log|ini|json)$)">
+    Require all denied
+</FilesMatch>

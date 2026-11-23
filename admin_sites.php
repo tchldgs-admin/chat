@@ -1,7 +1,20 @@
 <?php
+$is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => $is_https,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
+
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
+header("X-Frame-Options: DENY");
+header("Content-Security-Policy: frame-ancestors 'none';");
+header("X-Content-Type-Options: nosniff");
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     if (!headers_sent()) {
@@ -9,6 +22,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     }
     echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=login.php"></head><body><script>window.location.replace("login.php");</script></body></html>';
     exit;
+}
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 require_once 'db.php';
@@ -23,6 +40,7 @@ if ($me) {
 
 $admin_name = $_SESSION['admin_name'] ?? '管理者';
 $admin_role = $_SESSION['admin_role'] ?? 'admin';
+$csrf_token = $_SESSION['csrf_token'];
 
 if ($admin_role !== 'admin') {
     header("Location: admin.php");
@@ -311,6 +329,7 @@ $base_url = $protocol . $domain . $dir;
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = <?php echo json_encode($csrf_token); ?>;
     const baseUrl = <?php echo json_encode($base_url, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
     let sitesData = [];
 
@@ -446,6 +465,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (delBtn) {
             if (!confirm('このサイトを削除してもよろしいですか？\n※すでにこのサイトから受信した過去のチケット履歴は消えません。')) return;
             const fd = new FormData();
+            fd.append('csrf_token', csrfToken);
             fd.append('action', 'delete');
             fd.append('id', delBtn.dataset.id);
             const res = await fetch('admin_sites_api.php', { method: 'POST', body: fd });
@@ -490,7 +510,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // テストメール送信ボタン
     document.getElementById('btn-send-test-mail').addEventListener('click', async function() {
         const testTo = document.getElementById('test-mail-to').value.trim();
         if (!testTo) {
@@ -504,6 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             const fd = new FormData(document.getElementById('form-site'));
+            fd.append('csrf_token', csrfToken);
             fd.append('action', 'test_mail');
             fd.append('test_to', testTo);
 
@@ -525,6 +545,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('form-site').addEventListener('submit', async function(e) {
         e.preventDefault();
         const fd = new FormData(this);
+        fd.append('csrf_token', csrfToken);
         fd.append('action', 'save');
         const res = await fetch('admin_sites_api.php', { method: 'POST', body: fd });
         const data = await res.json();

@@ -1,7 +1,20 @@
 <?php
+$is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => $is_https,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
+
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
+header("X-Frame-Options: DENY");
+header("Content-Security-Policy: frame-ancestors 'none';");
+header("X-Content-Type-Options: nosniff");
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     if (!headers_sent()) {
@@ -9,6 +22,10 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     }
     echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=login.php"></head><body><script>window.location.replace("login.php");</script></body></html>';
     exit;
+}
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 require_once 'db.php';
@@ -38,6 +55,17 @@ try {
 $admin_name = $_SESSION['admin_name'] ?? '管理者';
 $admin_role = $_SESSION['admin_role'] ?? 'admin';
 $is_admin   = ($admin_role === 'admin');
+$csrf_token = $_SESSION['csrf_token'];
+
+// 現在の受付状態（メンテナンスモード）の取得
+$config_file = __DIR__ . '/config.json';
+$is_maintenance = false;
+if (file_exists($config_file)) {
+    $loaded_cfg = json_decode(file_get_contents($config_file), true);
+    if (is_array($loaded_cfg)) {
+        $is_maintenance = !empty($loaded_cfg['maintenance_mode']);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -75,11 +103,41 @@ $is_admin   = ($admin_role === 'admin');
         .top-nav li.disabled a { color: #a0aec0; cursor: default; }
         .ticket-badge { background: #e53e3e; color: #fff; font-size: 11px; font-weight: bold; padding: 1px 6px; border-radius: 10px; margin-left: 5px; }
         
-        .header-right { display: flex; align-items: center; gap: 16px; color: #666; }
+        .header-right { display: flex; align-items: center; gap: 14px; color: #666; }
         .form-link-btn { font-size: 12px; color: var(--primary-blue); text-decoration: none; border: 1px solid var(--primary-blue); padding: 4px 10px; border-radius: 4px; }
         .form-link-btn:hover { background: #ebf8ff; }
         .logout-link { color: #666; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e0; }
         .logout-link:hover { background: #f7fafc; color: #e53e3e; border-color: #feb2b2; }
+
+        /* 受付中 / メンテナンス中 ドロップダウン */
+        .status-dropdown-wrap { position: relative; }
+        .status-dropdown-btn {
+            background: #fff; border: 1px solid #cbd5e0; border-radius: 4px; padding: 5px 10px;
+            font-size: 12px; font-weight: bold; color: #2d3748; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s;
+        }
+        .status-dropdown-btn:hover { background: #f7fafc; }
+        .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+        .status-dot.active { background: #38a169; }
+        .status-dot.maintenance { background: #e53e3e; }
+        .status-dropdown-menu {
+            display: none; position: absolute; right: 0; top: calc(100% + 4px); background: #fff;
+            border: 1px solid #cbd5e0; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            min-width: 165px; z-index: 150; list-style: none; padding: 4px 0;
+        }
+        .status-dropdown-menu.open { display: block; }
+        .status-dropdown-item {
+            padding: 8px 14px; font-size: 12px; cursor: pointer; display: flex; align-items: center;
+            justify-content: space-between; color: #2d3748;
+        }
+        .status-dropdown-item:hover { background: #edf2f7; }
+
+        /* メンテナンス中の警告バナー */
+        .maintenance-banner {
+            background: #fff5f5; border: 1px solid #feb2b2; color: #c53030;
+            padding: 10px 14px; border-radius: 4px; margin-bottom: 14px;
+            font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 8px;
+        }
 
         .layout-wrapper { display: flex; padding-top: 54px; min-height: 100vh; }
 
@@ -246,6 +304,13 @@ $is_admin   = ($admin_role === 'admin');
         .event-header { padding: 9px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: rgba(0,0,0,0.015); }
         .event-header:hover { background: rgba(0,0,0,0.03); }
         .event-sender { font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .sender-agent-badge {
+            background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0;
+            font-size: 11px; padding: 1px 7px; border-radius: 4px; font-weight: bold;
+        }
+        .event-card.memo .sender-agent-badge {
+            background: #fefcbf; border-color: #d69e2e; color: #744210;
+        }
         .event-preview { color: #718096; font-weight: normal; font-size: 12px; margin-left: 8px; }
         .event-body { padding: 14px; border-top: 1px solid #edf2f7; white-space: pre-wrap; line-height: 1.65; font-size: 13px; }
         .event-card.collapsed .event-body { display: none; }
@@ -298,6 +363,29 @@ $is_admin   = ($admin_role === 'admin');
     </div>
     <div class="header-right">
         <?php if ($is_admin): ?>
+            <!-- 受付中 / メンテナンス中 切替ドロップダウン（管理者のみ） -->
+            <div class="status-dropdown-wrap" id="maint-dropdown-wrap">
+                <button type="button" class="status-dropdown-btn" id="maint-dropdown-btn">
+                    <span class="status-dot <?php echo $is_maintenance ? 'maintenance' : 'active'; ?>" id="maint-dot"></span>
+                    <span id="maint-label"><?php echo $is_maintenance ? 'メンテナンス中' : '受付中'; ?></span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+                </button>
+                <ul class="status-dropdown-menu" id="maint-dropdown-menu">
+                    <li class="status-dropdown-item" data-mode="0">
+                        <span style="display:inline-flex; align-items:center; gap:6px;">
+                            <span class="status-dot active"></span> 受付中
+                        </span>
+                        <span class="check-mark" style="<?php echo !$is_maintenance ? '' : 'display:none;'; ?>">✓</span>
+                    </li>
+                    <li class="status-dropdown-item" data-mode="1">
+                        <span style="display:inline-flex; align-items:center; gap:6px;">
+                            <span class="status-dot maintenance"></span> メンテナンス中
+                        </span>
+                        <span class="check-mark" style="<?php echo $is_maintenance ? '' : 'display:none;'; ?>">✓</span>
+                    </li>
+                </ul>
+            </div>
+
             <a href="admin_sites.php" class="form-link-btn">フォーム埋め込み・サイト管理 ↗</a>
         <?php endif; ?>
         <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px; font-weight:bold; color:#333;">
@@ -388,6 +476,11 @@ $is_admin   = ($admin_role === 'admin');
 
     <!-- メインエリア -->
     <main class="main-content">
+        <div class="maintenance-banner" id="maintenance-banner" style="<?php echo $is_maintenance ? '' : 'display:none;'; ?>">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+            <span>現在「メンテナンス中」に設定されています。お客様用ページからの追加返信受付を休止しています。</span>
+        </div>
+
         <div class="breadcrumb">チケット</div>
         <h1 class="page-title" id="current-view-title">一覧</h1>
 
@@ -589,6 +682,7 @@ $is_admin   = ($admin_role === 'admin');
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = <?php echo json_encode($csrf_token); ?>;
     let currentStatusGroup = 'active';
     let sortBy = 'elapsed';
     let sortOrder = 'desc';
@@ -636,6 +730,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function apiPost(formDataObj) {
         const formData = new FormData();
+        formData.append('csrf_token', csrfToken);
         for (const [k, v] of Object.entries(formDataObj)) {
             if (Array.isArray(v)) {
                 v.forEach(item => formData.append(k + '[]', item));
@@ -651,7 +746,43 @@ document.addEventListener('DOMContentLoaded', function() {
         return await res.json();
     }
 
-    // 1行分のチケットHTMLを生成する共通関数
+    // 受付中 / メンテナンス中 切替ドロップダウン（管理者のみ）
+    const maintBtn = document.getElementById('maint-dropdown-btn');
+    const maintMenu = document.getElementById('maint-dropdown-menu');
+    if (maintBtn && maintMenu) {
+        maintBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            maintMenu.classList.toggle('open');
+        });
+
+        maintMenu.querySelectorAll('.status-dropdown-item').forEach(item => {
+            item.addEventListener('click', async function(e) {
+                e.stopPropagation();
+                const mode = this.dataset.mode;
+                maintMenu.classList.remove('open');
+
+                const res = await apiPost({ action: 'set_maintenance', maintenance_mode: mode });
+                if (res.success) {
+                    const isMaint = !!res.maintenance_mode;
+                    document.getElementById('maint-dot').className = 'status-dot ' + (isMaint ? 'maintenance' : 'active');
+                    document.getElementById('maint-label').textContent = isMaint ? 'メンテナンス中' : '受付中';
+                    document.getElementById('maintenance-banner').style.display = isMaint ? 'flex' : 'none';
+
+                    maintMenu.querySelectorAll('.status-dropdown-item').forEach(li => {
+                        const check = li.querySelector('.check-mark');
+                        check.style.display = (li.dataset.mode === (isMaint ? '1' : '0')) ? 'inline' : 'none';
+                    });
+                } else {
+                    alert(res.error || '切り替えに失敗しました');
+                }
+            });
+        });
+
+        document.addEventListener('click', function() {
+            maintMenu.classList.remove('open');
+        });
+    }
+
     function renderTicketItem(t) {
         const alertClass = t.alert_level ? `alert-${t.alert_level}` : '';
         const unreadClass = (t.is_read == 0) ? 'unread' : '';
@@ -686,7 +817,6 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>`;
     }
 
-    // 指定ステータスの個別一覧へ移動する関数
     function navigateToStatus(statusCode) {
         const targetLi = document.querySelector(`#side-status-menu li[data-status="${statusCode}"]`);
         if (targetLi) {
@@ -748,7 +878,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // 「一覧」モードのときはステータスごとのセクションに分けて最大10件＋3点リーダー表示
             if (currentStatusGroup === 'active') {
                 const selectedStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => Number(cb.value));
                 const targetStatuses = selectedStatuses.length > 0 ? selectedStatuses : [11, 12, 13];
@@ -784,7 +913,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 container.innerHTML = html || '<div style="padding:40px; text-align:center; color:#718096;">該当するチケットはありません</div>';
             } else {
-                // 個別ステータス一覧では全件をそのまま表示
                 container.innerHTML = res.tickets.map(renderTicketItem).join('');
             }
 
@@ -855,13 +983,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const eventsHtml = msgs.map((m, idx) => {
                 const isLast = (idx === msgs.length - 1);
                 const collapsedClass = isLast ? '' : 'collapsed';
+                const agentBadge = m.sender_name ? `<span class="sender-agent-badge">${esc(m.sender_name)}</span>` : '';
                 let senderLabel = '';
                 if (m.sender_type === 'customer') {
                     senderLabel = `${svgIcons.person} ${esc(t.customer_name)} &lt;${esc(t.customer_email)}&gt;`;
                 } else if (m.sender_type === 'memo') {
-                    senderLabel = `${svgIcons.memo} 社内メモ（お客様には非表示）`;
+                    senderLabel = `${svgIcons.memo} 社内メモ（お客様には非表示） ${agentBadge}`;
                 } else {
-                    senderLabel = `${svgIcons.support} サポート担当`;
+                    senderLabel = `${svgIcons.support} サポート担当 ${agentBadge}`;
                 }
 
                 return `
@@ -927,7 +1056,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     document.addEventListener('click', async function(e) {
-        // 各セクションの「〇〇一覧」ボタン or 「3点リーダー」クリック
         const goStatusBtn = e.target.closest('.btn-go-status');
         if (goStatusBtn) {
             e.preventDefault();
@@ -1165,7 +1293,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        // 個別ステータス画面表示中に「詳細」で複数ステータス等を変更して検索した場合は「一覧」へ切り替える
         if (currentStatusGroup !== 'active') {
             const isDifferentFromSingle = !(checkedStatuses.length === 1 && checkedStatuses[0] === currentStatusGroup);
             if (isDifferentFromSingle) {

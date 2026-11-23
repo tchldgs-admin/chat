@@ -1,5 +1,23 @@
 <?php
+$is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => $is_https,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
+
+header("X-Frame-Options: DENY");
+header("Content-Security-Policy: frame-ancestors 'none';");
+header("X-Content-Type-Options: nosniff");
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 require_once 'db.php';
 
 // adminsテーブルにname（担当者名）とrole（権限）カラムがなければ自動追加
@@ -29,10 +47,13 @@ $error_message = '';
 
 // ログインボタンが押されたときの処理
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $posted_token = $_POST['csrf_token'] ?? '';
+    $email        = trim($_POST['email'] ?? '');
+    $password     = $_POST['password'] ?? '';
 
-    if ($email === '' || $password === '') {
+    if (!hash_equals($_SESSION['csrf_token'], $posted_token)) {
+        $error_message = '不正なリクエストが検出されました。画面を再読み込みしてもう一度お試しください。';
+    } elseif ($email === '' || $password === '') {
         $error_message = 'メールアドレスとパスワードを入力してください。';
     } else {
         $stmt = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
@@ -49,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['admin_email']     = $admin['email'];
             $_SESSION['admin_name']      = $display_name;
             $_SESSION['admin_role']      = $role;
+            $_SESSION['csrf_token']      = bin2hex(random_bytes(32));
             
             if (!headers_sent()) {
                 header("Location: admin.php");
@@ -87,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 <div id="login_container">
     <form id="form-signin" action="" method="post" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
         <h2 class="form-signin-heading">
             TC Plus
         </h2>

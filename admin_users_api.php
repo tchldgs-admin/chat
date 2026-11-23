@@ -1,5 +1,17 @@
 <?php
+$is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => $is_https,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
+
+header("X-Content-Type-Options: nosniff");
+
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('HTTP/1.1 401 Unauthorized');
     header('Content-Type: application/json; charset=utf-8');
@@ -7,10 +19,23 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $posted_token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    if (!hash_equals($_SESSION['csrf_token'], $posted_token)) {
+        header('HTTP/1.1 403 Forbidden');
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'セキュリティトークンが無効です。画面を再読み込みしてください。']);
+        exit;
+    }
+}
+
 require_once 'db.php';
 header('Content-Type: application/json; charset=utf-8');
 
-// adminsテーブルにname（担当者名）とrole（権限）カラムがなければ自動追加
 try {
     $cols = $pdo->query("SHOW COLUMNS FROM admins")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('name', $cols)) {
@@ -24,7 +49,6 @@ try {
     error_log("Admins Table Migration Error: " . $e->getMessage());
 }
 
-// 最新の自分の権限を確認（一般権限はアクセス不可）
 $current_email = $_SESSION['admin_email'] ?? '';
 $stmt_me = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
 $stmt_me->execute([$current_email]);
@@ -72,7 +96,6 @@ try {
         }
 
         if ($id === '') {
-            // 新規追加
             if ($password === '' || strlen($password) < 6) {
                 throw new Exception('新規追加時は6文字以上のパスワードが必須です。');
             }
@@ -88,7 +111,6 @@ try {
             $stmt->execute([$name, $email, $hash, $role]);
 
         } else {
-            // 編集（更新）
             $stmt_old = $pdo->prepare("SELECT * FROM admins WHERE id = ?");
             $stmt_old->execute([$id]);
             $old_user = $stmt_old->fetch();
@@ -96,14 +118,12 @@ try {
                 throw new Exception('対象の担当者が見つかりません。');
             }
 
-            // 自分以外の重複チェック
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM admins WHERE email = ? AND id != ?");
             $stmt->execute([$email, $id]);
             if ($stmt->fetchColumn() > 0) {
                 throw new Exception('このメールアドレスは他の担当者が使用しています。');
             }
 
-            // 管理者から一般へ変更する場合、他に管理者が最低1人残るかチェック
             if (($old_user['role'] ?? 'admin') === 'admin' && $role === 'general') {
                 $admin_cnt = (int)$pdo->query("SELECT COUNT(*) FROM admins WHERE role = 'admin'")->fetchColumn();
                 if ($admin_cnt <= 1) {
@@ -123,7 +143,6 @@ try {
                 $stmt->execute([$name, $email, $role, $id]);
             }
 
-            // ログイン中の自分自身を編集した場合はセッション情報も即時更新
             if ($me && (int)$me['id'] === (int)$id) {
                 $_SESSION['admin_name']  = $name;
                 $_SESSION['admin_email'] = $email;

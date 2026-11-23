@@ -1,7 +1,20 @@
 <?php
+$is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => $is_https,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
+
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
+header("X-Frame-Options: DENY");
+header("Content-Security-Policy: frame-ancestors 'none';");
+header("X-Content-Type-Options: nosniff");
 
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     if (!headers_sent()) {
@@ -11,9 +24,12 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 require_once 'db.php';
 
-// DBから最新の表示名と権限を取得してセッションに同期
 $stmt_me = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
 $stmt_me->execute([$_SESSION['admin_email'] ?? '']);
 $me = $stmt_me->fetch();
@@ -24,8 +40,8 @@ if ($me) {
 
 $admin_name = $_SESSION['admin_name'] ?? '管理者';
 $admin_role = $_SESSION['admin_role'] ?? 'admin';
+$csrf_token = $_SESSION['csrf_token'];
 
-// 「一般」権限の場合はチケット画面へリダイレクト
 if ($admin_role !== 'admin') {
     header("Location: admin.php");
     exit;
@@ -214,7 +230,7 @@ if ($admin_role !== 'admin') {
                 <div class="form-group">
                     <label>担当者名（表示名）<span style="color:#e53e3e;">*</span></label>
                     <input type="text" name="name" id="user-name" class="form-control" required placeholder="例: 山田 太郎">
-                    <div class="form-note">※画面右上のアカウント表示や担当者一覧に表示される名前です。</div>
+                    <div class="form-note">※画面右上のアカウント表示や返信履歴に表示される名前です。</div>
                 </div>
 
                 <div class="form-group">
@@ -246,6 +262,7 @@ if ($admin_role !== 'admin') {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = <?php echo json_encode($csrf_token); ?>;
     let usersData = [];
 
     function esc(str) {
@@ -308,7 +325,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 新規追加ボタン
     document.getElementById('btn-add-user').addEventListener('click', function() {
         document.getElementById('form-user').reset();
         document.getElementById('user-id').value = '';
@@ -320,7 +336,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('modal-user').classList.add('open');
     });
 
-    // クリックイベント（編集・削除・モーダル閉じる）
     document.addEventListener('click', async function(e) {
         const editBtn = e.target.closest('.btn-edit');
         if (editBtn) {
@@ -345,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (delBtn) {
             if (!confirm('この担当者を削除してもよろしいですか？\n※この操作は取り消せません。')) return;
             const fd = new FormData();
+            fd.append('csrf_token', csrfToken);
             fd.append('action', 'delete');
             fd.append('id', delBtn.dataset.id);
             const res = await fetch('admin_users_api.php', { method: 'POST', body: fd });
@@ -363,15 +379,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // フォーム送信
     document.getElementById('form-user').addEventListener('submit', async function(e) {
         e.preventDefault();
         const fd = new FormData(this);
+        fd.append('csrf_token', csrfToken);
         fd.append('action', 'save');
         const res = await fetch('admin_users_api.php', { method: 'POST', body: fd });
         const data = await res.json();
         if (data.success) {
-            // 自分の名前が変わった場合に備えてページをリロードしヘッダー表示も最新化
             window.location.reload();
         } else {
             alert(data.error || '保存に失敗しました');

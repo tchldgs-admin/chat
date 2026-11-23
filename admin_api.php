@@ -1,10 +1,37 @@
 <?php
+$is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => $is_https,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
+
+header("X-Content-Type-Options: nosniff");
+
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('HTTP/1.1 401 Unauthorized');
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'error' => 'ログインが必要です']);
     exit;
+}
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// POSTリクエストのCSRF検証
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $posted_token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    if (!hash_equals($_SESSION['csrf_token'], $posted_token)) {
+        header('HTTP/1.1 403 Forbidden');
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'セキュリティトークンが無効です。画面を再読み込みしてください。']);
+        exit;
+    }
 }
 
 require_once 'db.php';
@@ -51,21 +78,45 @@ try {
     if (!in_array('is_read', $columns)) {
         $pdo->exec("ALTER TABLE tickets ADD COLUMN is_read TINYINT(1) DEFAULT 0 AFTER status");
     }
+
+    // messagesテーブルに返信担当者名(sender_name)カラムがなければ自動追加
+    $msg_columns = $pdo->query("SHOW COLUMNS FROM messages")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('sender_name', $msg_columns)) {
+        $pdo->exec("ALTER TABLE messages ADD COLUMN sender_name VARCHAR(100) DEFAULT '' AFTER sender_type");
+    }
 } catch (Exception $e) {
     error_log("DB Structure Check Error: " . $e->getMessage());
+}
+
+// ログイン中ユーザーの最新情報を取得
+$current_admin_name = $_SESSION['admin_name'] ?? '管理者';
+$current_admin_role = $_SESSION['admin_role'] ?? 'admin';
+try {
+    $stmt_me = $pdo->prepare("SELECT name, email, role FROM admins WHERE email = ?");
+    $stmt_me->execute([$_SESSION['admin_email'] ?? '']);
+    $me = $stmt_me->fetch();
+    if ($me) {
+        $current_admin_name = !empty($me['name']) ? $me['name'] : explode('@', $me['email'])[0];
+        $current_admin_role = !empty($me['role']) ? $me['role'] : 'admin';
+        $_SESSION['admin_name'] = $current_admin_name;
+        $_SESSION['admin_role'] = $current_admin_role;
+    }
+} catch (Exception $e) {
+    error_log("Admin Lookup Error: " . $e->getMessage());
 }
 
 // 2. 設定ファイル（config.json）の読み込み・初期作成
 $config_file = __DIR__ . '/config.json';
 $default_signature = "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
 $default_config = [
-    'from_email' => 'no-reply@cc-circle.net',
-    'from_name'  => 'サポートデスク',
-    'signature'  => $default_signature,
-    'agents'     => ['担当者A', '担当者B', 'サポート窓口'],
-    'categories' => ['一般問い合わせ', '操作方法', '不具合・エラー', '契約・お支払い', 'その他'],
-    'site_name'  => 'メインサイト',
-    'sites'      => [
+    'maintenance_mode' => false,
+    'from_email'       => 'no-reply@cc-circle.net',
+    'from_name'        => 'サポートデスク',
+    'signature'        => $default_signature,
+    'agents'           => ['担当者A', '担当者B', 'サポート窓口'],
+    'categories'       => ['一般問い合わせ', '操作方法', '不具合・エラー', '契約・お支払い', 'その他'],
+    'site_name'        => 'メインサイト',
+    'sites'            => [
         [
             'id'         => 'default',
             'name'       => 'メインサイト',
@@ -446,6 +497,7 @@ try {
         foreach ($messages as &$m) {
             $m['elapsed_text'] = format_elapsed($m['created_at']);
             $m['short_body'] = mb_strimwidth(str_replace(["\r", "\n"], ' ', $m['body']), 0, 90, '...');
+            $m['sender_name'] = $m['sender_name'] ?? '';
         }
 
         echo json_encode([
@@ -457,7 +509,7 @@ try {
     }
 
     // --------------------------------------------------
-    // 3. 返信送信・社内メモ追加・ステータス更新
+    // 3. 返信送信・社内メモ追加・ステータス更新（返信者のアカウント名を記録）
     // --------------------------------------------------
     if ($action === 'reply') {
         $ticket_id  = (int)($_POST['ticket_id'] ?? 0);
@@ -477,8 +529,8 @@ try {
 
         if ($body !== '') {
             $sender_type = ($reply_type === 'memo') ? 'memo' : 'support';
-            $stmt_m = $pdo->prepare("INSERT INTO messages (ticket_id, sender_type, body) VALUES (?, ?, ?)");
-            $stmt_m->execute([$ticket_id, $sender_type, $body]);
+            $stmt_m = $pdo->prepare("INSERT INTO messages (ticket_id, sender_type, sender_name, body) VALUES (?, ?, ?, ?)");
+            $stmt_m->execute([$ticket_id, $sender_type, $current_admin_name, $body]);
         }
 
         $stmt_u = $pdo->prepare("UPDATE tickets SET status = ?, updated_at = NOW(), is_read = 1 WHERE id = ?");
@@ -548,7 +600,7 @@ try {
     }
 
     // --------------------------------------------------
-    // 5. 「+ チケットを追加」からの新規作成
+    // 5. 「+ チケットを追加」からの新規作成（作成者のアカウント名を記録）
     // --------------------------------------------------
     if ($action === 'create_ticket') {
         $name      = trim($_POST['customer_name'] ?? '');
@@ -570,8 +622,8 @@ try {
         $stmt->execute([$secret_key, $name, $email, $subject, $assignee, $site_name, $category]);
         $ticket_id = $pdo->lastInsertId();
 
-        $stmt_m = $pdo->prepare("INSERT INTO messages (ticket_id, sender_type, body) VALUES (?, 'support', ?)");
-        $stmt_m->execute([$ticket_id, $body]);
+        $stmt_m = $pdo->prepare("INSERT INTO messages (ticket_id, sender_type, sender_name, body) VALUES (?, 'support', ?, ?)");
+        $stmt_m->execute([$ticket_id, $current_admin_name, $body]);
         $pdo->commit();
 
         if ($send_mail) {
@@ -602,12 +654,7 @@ try {
     // 6. 「⚙ チケット設定」の保存（管理者権限のみ許可）
     // --------------------------------------------------
     if ($action === 'save_settings') {
-        $stmt_me = $pdo->prepare("SELECT role FROM admins WHERE email = ?");
-        $stmt_me->execute([$_SESSION['admin_email'] ?? '']);
-        $me = $stmt_me->fetch();
-        $my_role = $me['role'] ?? ($_SESSION['admin_role'] ?? 'admin');
-
-        if ($my_role !== 'admin') {
+        if ($current_admin_role !== 'admin') {
             header('HTTP/1.1 403 Forbidden');
             throw new Exception('この操作を行う権限がありません。');
         }
@@ -619,6 +666,25 @@ try {
             throw new Exception('設定ファイル（config.json）の保存に失敗しました。ファイルの書き込み権限を確認してください。');
         }
         echo json_encode(['success' => true]);
+        exit;
+    }
+
+    // --------------------------------------------------
+    // 7. 「受付中 / メンテナンス中」の切り替え（管理者権限のみ許可）
+    // --------------------------------------------------
+    if ($action === 'set_maintenance') {
+        if ($current_admin_role !== 'admin') {
+            header('HTTP/1.1 403 Forbidden');
+            throw new Exception('この操作を行う権限がありません。');
+        }
+
+        $is_maint = !empty($_POST['maintenance_mode']) && $_POST['maintenance_mode'] === '1';
+        $config['maintenance_mode'] = $is_maint;
+
+        if (file_put_contents($config_file, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) === false) {
+            throw new Exception('設定ファイル（config.json）の保存に失敗しました。');
+        }
+        echo json_encode(['success' => true, 'maintenance_mode' => $is_maint]);
         exit;
     }
 

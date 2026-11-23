@@ -1,5 +1,17 @@
 <?php
+$is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => $is_https,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
+
+header("X-Content-Type-Options: nosniff");
+
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('HTTP/1.1 401 Unauthorized');
     header('Content-Type: application/json; charset=utf-8');
@@ -7,10 +19,23 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $posted_token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    if (!hash_equals($_SESSION['csrf_token'], $posted_token)) {
+        header('HTTP/1.1 403 Forbidden');
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'セキュリティトークンが無効です。画面を再読み込みしてください。']);
+        exit;
+    }
+}
+
 require_once 'db.php';
 header('Content-Type: application/json; charset=utf-8');
 
-// 最新の自分の権限を確認（一般権限はアクセス不可）
 $stmt_me = $pdo->prepare("SELECT role FROM admins WHERE email = ?");
 $stmt_me->execute([$_SESSION['admin_email'] ?? '']);
 $me = $stmt_me->fetch();
@@ -25,13 +50,14 @@ if ($my_role !== 'admin') {
 $config_file = __DIR__ . '/config.json';
 $default_signature = "--------------------------------------------------\nサポートデスク\n※このメールは送信専用アドレスから配信されています。\n--------------------------------------------------";
 $default_config = [
-    'from_email' => 'no-reply@cc-circle.net',
-    'from_name'  => 'サポートデスク',
-    'signature'  => $default_signature,
-    'agents'     => ['担当者A', '担当者B', 'サポート窓口'],
-    'categories' => ['一般問い合わせ', '操作方法', '不具合・エラー', '契約・お支払い', 'その他'],
-    'site_name'  => 'メインサイト',
-    'sites'      => [
+    'maintenance_mode' => false,
+    'from_email'       => 'no-reply@cc-circle.net',
+    'from_name'        => 'サポートデスク',
+    'signature'        => $default_signature,
+    'agents'           => ['担当者A', '担当者B', 'サポート窓口'],
+    'categories'       => ['一般問い合わせ', '操作方法', '不具合・エラー', '契約・お支払い', 'その他'],
+    'site_name'        => 'メインサイト',
+    'sites'            => [
         [
             'id'         => 'default',
             'name'       => 'メインサイト',
@@ -71,7 +97,6 @@ if (empty($config['sites']) || !is_array($config['sites'])) {
     ];
 }
 
-// SMTPソケット応答読み取り
 function smtp_read_response($fp) {
     $data = '';
     while ($str = fgets($fp, 515)) {
@@ -83,7 +108,6 @@ function smtp_read_response($fp) {
     return $data;
 }
 
-// SMTPソケット送信関数（Google Workspace / ロリポップ対応）
 function send_via_smtp($to, $subject, $body, $from_email, $from_name, $smtp) {
     $host = trim($smtp['smtp_host'] ?? '');
     $port = (int)($smtp['smtp_port'] ?? 465);
@@ -122,7 +146,6 @@ function send_via_smtp($to, $subject, $body, $from_email, $from_name, $smtp) {
         return ['ok' => false, 'error' => "EHLOエラー: {$res}"];
     }
 
-    // 587番ポート等の場合はSTARTTLSで暗号化開始
     if ($port !== 465) {
         fwrite($fp, "STARTTLS\r\n");
         $res = smtp_read_response($fp);
@@ -142,7 +165,6 @@ function send_via_smtp($to, $subject, $body, $from_email, $from_name, $smtp) {
         $res = smtp_read_response($fp);
     }
 
-    // AUTH LOGIN 認証
     fwrite($fp, "AUTH LOGIN\r\n");
     $res = smtp_read_response($fp);
     if (strpos($res, '334') !== 0) {
@@ -164,7 +186,6 @@ function send_via_smtp($to, $subject, $body, $from_email, $from_name, $smtp) {
         return ['ok' => false, 'error' => "SMTP認証失敗（ユーザー名またはパスワードを確認してください）: {$res}"];
     }
 
-    // MAIL FROM / RCPT TO
     $envelope_from = filter_var($user, FILTER_VALIDATE_EMAIL) ? $user : $from_email;
     fwrite($fp, "MAIL FROM:<{$envelope_from}>\r\n");
     $res = smtp_read_response($fp);
@@ -193,18 +214,18 @@ function send_via_smtp($to, $subject, $body, $from_email, $from_name, $smtp) {
     $encoded_body    = chunk_split(base64_encode($normalized_body));
     $msg_id          = '<' . bin2hex(random_bytes(12)) . '@' . ($helo_host ?: 'tc-plus') . '>';
 
-    $raw_msg  = "Date: " . date('r') . "\r\n";
-    $raw_msg .= "Message-ID: {$msg_id}\r\n";
-    $raw_msg .= "From: {$encoded_name} <{$from_email}>\r\n";
-    $raw_msg .= "Reply-To: {$from_email}\r\n";
-    $raw_msg .= "To: <{$to}>\r\n";
-    $raw_msg .= "Subject: {$encoded_subject}\r\n";
-    $raw_msg .= "MIME-Version: 1.0\r\n";
-    $raw_msg .= "Content-Type: text/plain; charset=UTF-8\r\n";
-    $raw_msg .= "Content-Transfer-Encoding: base64\r\n\r\n";
-    $raw_msg .= $encoded_body . "\r\n.\r\n";
+    $raw  = "Date: " . date('r') . "\r\n";
+    $raw .= "Message-ID: {$msg_id}\r\n";
+    $raw .= "From: {$encoded_name} <{$from_email}>\r\n";
+    $raw .= "Reply-To: {$from_email}\r\n";
+    $raw .= "To: <{$to}>\r\n";
+    $raw .= "Subject: {$encoded_subject}\r\n";
+    $raw .= "MIME-Version: 1.0\r\n";
+    $raw .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $raw .= "Content-Transfer-Encoding: base64\r\n\r\n";
+    $raw .= $enc_body . "\r\n.\r\n";
 
-    fwrite($fp, $raw_msg);
+    fwrite($fp, $raw);
     $res = smtp_read_response($fp);
     fwrite($fp, "QUIT\r\n");
     fclose($fp);
@@ -328,7 +349,6 @@ try {
             throw new Exception('テスト送信先のメールアドレスを正しく入力してください。');
         }
 
-        // パスワードが空欄なら保存済みのパスワードを取得
         if ($smtp_pass === '' && $id !== '') {
             foreach ($config['sites'] as $s) {
                 if (($s['id'] ?? '') === $id) {
