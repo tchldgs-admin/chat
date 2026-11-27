@@ -79,6 +79,7 @@ if ($admin_role !== 'admin') {
         .brand-logo .icon-box { background: var(--primary-blue); color: #fff; width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
         .top-nav { display: flex; height: 100%; list-style: none; gap: 6px; }
         .top-nav li a { display: flex; align-items: center; height: 100%; padding: 0 14px; text-decoration: none; color: #555; font-weight: bold; font-size: 14px; }
+        .top-nav li a:hover { color: var(--primary-blue); }
         .top-nav li.disabled a { color: #a0aec0; cursor: default; }
         .header-right { display: flex; align-items: center; gap: 16px; color: #666; }
         .logout-link { color: #666; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e0; }
@@ -151,7 +152,7 @@ if ($admin_role !== 'admin') {
             <span>TC Plus</span>
         </a>
         <ul class="top-nav">
-            <li class="disabled"><a href="#" onclick="return false;">チャット</a></li>
+            <li><a href="admin_bot.php">チャット</a></li>
             <li class="disabled"><a href="#" onclick="return false;">訪問者</a></li>
             <li class="disabled"><a href="#" onclick="return false;">履歴</a></li>
             <li><a href="admin.php">チケット</a></li>
@@ -178,6 +179,12 @@ if ($admin_role !== 'admin') {
                 <a href="admin.php">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
                     <span>チケット管理</span>
+                </a>
+            </li>
+            <li>
+                <a href="admin_bot.php">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+                    <span>チャットボット設定</span>
                 </a>
             </li>
         </ul>

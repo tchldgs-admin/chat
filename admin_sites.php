@@ -73,7 +73,6 @@ $base_url = $protocol . $domain . $dir;
         body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; color: var(--text-main); font-size: 13px; background: #fff; }
         svg { vertical-align: middle; flex-shrink: 0; }
 
-        /* ヘッダー周り */
         #top-header {
             height: 54px; background: #ffffff; border-bottom: 1px solid var(--border-color);
             display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
@@ -91,7 +90,6 @@ $base_url = $protocol . $domain . $dir;
         
         .layout-wrapper { display: flex; padding-top: 54px; min-height: 100vh; }
         
-        /* 左サイドバー */
         .sidebar { width: 185px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 16px 0; position: fixed; top: 54px; bottom: 0; left: 0; overflow-y: auto; }
         .side-menu { list-style: none; margin-bottom: 20px; }
         .side-menu li a { display: flex; align-items: center; gap: 10px; padding: 10px 18px; color: #4a5568; text-decoration: none; font-size: 13px; }
@@ -100,7 +98,6 @@ $base_url = $protocol . $domain . $dir;
         .side-menu svg { color: #718096; }
         .side-group-title { font-size: 11px; color: #a0aec0; font-weight: bold; padding: 0 18px; margin-bottom: 4px; margin-top: 16px; }
 
-        /* メインエリア */
         .main-content { flex: 1; margin-left: 185px; padding: 24px 32px; background: var(--bg-light); min-height: calc(100vh - 54px); }
         .breadcrumb { font-size: 12px; color: var(--text-sub); margin-bottom: 8px; }
         .page-title-area { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -108,7 +105,6 @@ $base_url = $protocol . $domain . $dir;
         .btn-primary { background: var(--primary-blue); color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
         .btn-primary:hover { background: #2188c4; }
 
-        /* サイトリストカード */
         .site-list { display: flex; flex-direction: column; gap: 16px; }
         .site-card { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 18px 20px; transition: box-shadow 0.2s; }
         .site-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-color: #cbd5e0; }
@@ -124,13 +120,13 @@ $base_url = $protocol . $domain . $dir;
         .smtp-badge-on { background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .smtp-badge-off { background: #fffaf0; border: 1px solid #fbd38d; color: #c05621; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
 
-        .site-actions { display: flex; gap: 8px; }
+        .site-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .btn-action { background: #f7fafc; border: 1px solid #e2e8f0; color: #4a5568; height: 34px; padding: 0 10px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: bold; text-decoration: none; transition: all 0.2s; }
         .btn-action:hover { background: #e2e8f0; }
         .btn-edit:hover { color: var(--primary-blue); border-color: #bee3f8; background: #ebf8ff; }
         .btn-delete:hover { color: #e53e3e; border-color: #fed7d7; background: #fff5f5; }
 
-        /* iframe発行ボックス */
+        .embed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .embed-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 12px 14px; }
         .embed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .embed-label { font-size: 12px; font-weight: bold; color: #4a5568; display: flex; align-items: center; gap: 6px; }
@@ -138,13 +134,12 @@ $base_url = $protocol . $domain . $dir;
         .btn-copy:hover { background: var(--navy-btn-hover); }
         .btn-copy.copied { background: #38a169; }
         .embed-code-input {
-            width: 100%; font-family: Consolas, Monaco, "Courier New", monospace; font-size: 12px;
+            width: 100%; font-family: Consolas, Monaco, "Courier New", monospace; font-size: 11.5px;
             background: #fff; border: 1px solid #cbd5e0; border-radius: 4px; padding: 8px 10px;
-            color: #2d3748; resize: none; height: 54px; line-height: 1.4;
+            color: #2d3748; resize: none; height: 64px; line-height: 1.4;
         }
         .embed-code-input:focus { outline: none; border-color: var(--primary-blue); }
 
-        /* モーダル */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
         .modal-overlay.open { display: flex; }
         .modal-dialog { background: #fff; width: 580px; max-width: 94vw; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
@@ -179,7 +174,7 @@ $base_url = $protocol . $domain . $dir;
             <span>TC Plus</span>
         </a>
         <ul class="top-nav">
-            <li class="disabled"><a href="#" onclick="return false;">チャット</a></li>
+            <li><a href="admin_bot.php">チャット</a></li>
             <li class="disabled"><a href="#" onclick="return false;">訪問者</a></li>
             <li class="disabled"><a href="#" onclick="return false;">履歴</a></li>
             <li><a href="admin.php">チケット</a></li>
@@ -208,6 +203,12 @@ $base_url = $protocol . $domain . $dir;
                     <span>チケット管理</span>
                 </a>
             </li>
+            <li>
+                <a href="admin_bot.php">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+                    <span>チャットボット設定</span>
+                </a>
+            </li>
         </ul>
         <div class="side-group-title">設定</div>
         <ul class="side-menu">
@@ -229,7 +230,7 @@ $base_url = $protocol . $domain . $dir;
     <main class="main-content">
         <div class="breadcrumb">設定 | サイト管理</div>
         <div class="page-title-area">
-            <h1 class="page-title">サイト管理・フォーム発行</h1>
+            <h1 class="page-title">サイト管理・フォーム＆チャットボット発行</h1>
             <button type="button" class="btn-primary" id="btn-add-site">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 <span>サイトを追加</span>
@@ -361,7 +362,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const container = document.getElementById('site-list-container');
             container.innerHTML = sitesData.map(s => {
                 const formUrl = `${baseUrl}/form.php?site=${encodeURIComponent(s.id)}`;
-                const iframeCode = `<iframe src="${formUrl}" width="100%" height="620" style="border:none;"></iframe>`;
+                const botUrl  = `${baseUrl}/bot.php?site=${encodeURIComponent(s.id)}`;
+                const iframeFormCode = `<iframe src="${formUrl}" width="100%" height="620" style="border:none;"></iframe>`;
+                const iframeBotCode  = `<iframe src="${botUrl}" style="position:fixed; bottom:0; right:16px; width:390px; height:580px; max-width:95vw; max-height:88vh; border:none; z-index:99999; background:transparent;" allowtransparency="true"></iframe>`;
                 const urlLink = s.url
                     ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)} ↗</a>`
                     : `<span style="color:#a0aec0;">設置URL未設定</span>`;
@@ -390,6 +393,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                         <div class="site-actions">
+                            <a href="admin_bot.php" class="btn-action" title="チャットボットデザイン・シナリオ編集">
+                                <span>ボット設定 ↗</span>
+                            </a>
                             <a href="${esc(formUrl)}" target="_blank" class="btn-action" title="フォームをプレビュー">
                                 <span>フォーム確認 ↗</span>
                             </a>
@@ -403,18 +409,32 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
 
-                    <div class="embed-box">
-                        <div class="embed-header">
-                            <span class="embed-label">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
-                                <span>HTML埋め込み用 iframe コード</span>
-                            </span>
-                            <button type="button" class="btn-copy" data-code="${esc(iframeCode)}">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                                <span>コードをコピー</span>
-                            </button>
+                    <div class="embed-grid">
+                        <div class="embed-box">
+                            <div class="embed-header">
+                                <span class="embed-label">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+                                    <span>お問い合わせフォーム埋め込み用 iframe</span>
+                                </span>
+                                <button type="button" class="btn-copy" data-code="${esc(iframeFormCode)}">
+                                    <span>コピー</span>
+                                </button>
+                            </div>
+                            <textarea class="embed-code-input" readonly onclick="this.select();">${esc(iframeFormCode)}</textarea>
                         </div>
-                        <textarea class="embed-code-input" readonly onclick="this.select();">${esc(iframeCode)}</textarea>
+
+                        <div class="embed-box" style="background:#f0fff4; border-color:#c6f6d5;">
+                            <div class="embed-header">
+                                <span class="embed-label" style="color:#276749;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+                                    <span>右下チャットボット埋め込み用 iframe</span>
+                                </span>
+                                <button type="button" class="btn-copy" style="background:#28a745;" data-code="${esc(iframeBotCode)}">
+                                    <span>コピー</span>
+                                </button>
+                            </div>
+                            <textarea class="embed-code-input" readonly onclick="this.select();">${esc(iframeBotCode)}</textarea>
+                        </div>
                     </div>
                 </div>`;
             }).join('');
@@ -493,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.execCommand('copy');
                 }
                 copyBtn.classList.add('copied');
-                span.textContent = 'コピーしました！';
+                span.textContent = 'コピー完了！';
                 setTimeout(() => {
                     copyBtn.classList.remove('copied');
                     span.textContent = origText;

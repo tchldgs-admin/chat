@@ -1,0 +1,658 @@
+<?php
+$is_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => $is_https,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
+session_start();
+
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("X-Frame-Options: DENY");
+header("Content-Security-Policy: frame-ancestors 'none';");
+header("X-Content-Type-Options: nosniff");
+
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    if (!headers_sent()) {
+        header("Location: login.php");
+    }
+    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="0;url=login.php"></head><body><script>window.location.replace("login.php");</script></body></html>';
+    exit;
+}
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+require_once 'db.php';
+
+$stmt_me = $pdo->prepare("SELECT * FROM admins WHERE email = ?");
+$stmt_me->execute([$_SESSION['admin_email'] ?? '']);
+$me = $stmt_me->fetch();
+if ($me) {
+    $_SESSION['admin_name'] = !empty($me['name']) ? $me['name'] : explode('@', $me['email'])[0];
+    $_SESSION['admin_role'] = !empty($me['role']) ? $me['role'] : 'admin';
+}
+
+$admin_name = $_SESSION['admin_name'] ?? '管理者';
+$admin_role = $_SESSION['admin_role'] ?? 'admin';
+$is_admin   = ($admin_role === 'admin');
+$csrf_token = $_SESSION['csrf_token'];
+
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+$domain = $_SERVER['HTTP_HOST'] ?? 'cc-circle.net';
+$dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+$base_url = $protocol . $domain . $dir;
+?>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チャットボット設定 - TC Plus</title>
+    <style>
+        :root {
+            --primary-blue: #29a3e5;
+            --navy-btn: #283e5c;
+            --navy-btn-hover: #1e2f47;
+            --sidebar-bg: #f4f6f9;
+            --border-color: #e2e8f0;
+            --text-main: #333333;
+            --text-sub: #718096;
+            --bg-light: #f7fafc;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; color: var(--text-main); font-size: 13px; background: var(--bg-light); }
+        svg { vertical-align: middle; flex-shrink: 0; }
+
+        /* 上部ヘッダー */
+        #top-header {
+            height: 54px; background: #ffffff; border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+        }
+        .header-left { display: flex; align-items: center; gap: 36px; height: 100%; }
+        .brand-logo { display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: bold; color: var(--primary-blue); text-decoration: none; }
+        .brand-logo .icon-box { background: var(--primary-blue); color: #fff; width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+        .top-nav { display: flex; height: 100%; list-style: none; gap: 6px; }
+        .top-nav li a { display: flex; align-items: center; height: 100%; padding: 0 14px; text-decoration: none; color: #555; font-weight: bold; font-size: 14px; }
+        .top-nav li.active a { color: var(--primary-blue); border-bottom: 3px solid var(--primary-blue); }
+        .top-nav li.disabled a { color: #a0aec0; cursor: default; }
+        .header-right { display: flex; align-items: center; gap: 14px; color: #666; }
+        .logout-link { color: #666; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e0; }
+
+        .layout-wrapper { display: flex; padding-top: 54px; min-height: 100vh; }
+
+        /* 左サイドバー */
+        .sidebar { width: 185px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 16px 0; position: fixed; top: 54px; bottom: 0; left: 0; overflow-y: auto; }
+        .side-group-title { font-size: 11px; color: #a0aec0; font-weight: bold; padding: 0 18px; margin-bottom: 4px; margin-top: 16px; }
+        .side-menu { list-style: none; }
+        .side-menu li a { display: flex; align-items: center; gap: 10px; padding: 10px 18px; color: #4a5568; text-decoration: none; font-size: 13px; cursor: pointer; }
+        .side-menu li a:hover { background: #e8edf3; }
+        .side-menu li.active a { background: #e2ecf7; color: #1a365d; font-weight: bold; border-left: 3px solid var(--primary-blue); }
+
+        /* メインエリア */
+        .main-content { flex: 1; margin-left: 185px; padding: 22px 28px; }
+        .top-bar-controls {
+            background: #fff; border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 14px 18px; margin-bottom: 18px;
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+        }
+        .site-selector-group { display: flex; align-items: center; gap: 10px; }
+        .form-control { padding: 7px 10px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px; background: #fff; }
+        .form-control:focus { outline: none; border-color: var(--primary-blue); }
+        .btn-primary { background: var(--primary-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .btn-primary:hover { background: #2188c4; }
+        .btn-navy { background: var(--navy-btn); color: #fff; border: none; padding: 7px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* デザイン設定2カラム（左：設定フォーム / 右：リアルタイムプレビュー） */
+        .design-grid { display: grid; grid-template-columns: 1fr 410px; gap: 20px; align-items: start; }
+        .card-box { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 20px; margin-bottom: 16px; }
+        .card-title { font-size: 15px; font-weight: bold; color: #2d3748; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 16px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 12.5px; color: #4a5568; }
+        .form-note { font-size: 11px; color: #718096; margin-top: 4px; line-height: 1.5; }
+
+        .preview-sticky { position: sticky; top: 74px; }
+        .preview-frame-box {
+            background: linear-gradient(135deg, #e2e8f0 0%, #edf2f7 100%);
+            border: 1px solid #cbd5e0; border-radius: 8px;
+            height: 600px; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .preview-bar {
+            background: #2d3748; color: #fff; padding: 8px 12px; font-size: 11px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .preview-iframe { width: 100%; flex: 1; border: none; background: transparent; }
+
+        /* ツリーエディタ（視覚的シナリオ編集） */
+        .tree-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .tree-nodes-list { display: flex; flex-direction: column; gap: 16px; }
+        .tree-node-card {
+            background: #fff; border: 1px solid #cbd5e0; border-left: 5px solid var(--primary-blue);
+            border-radius: 6px; padding: 16px 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+        }
+        .tree-node-card.is-start { border-left-color: #38a169; }
+        .tree-node-card.is-form { border-left-color: #d69e2e; }
+        .node-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; }
+        .node-badge { background: #ebf8ff; color: #2b6cb0; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 4px; }
+        .tree-node-card.is-start .node-badge { background: #f0fff4; color: #276749; }
+        .tree-node-card.is-form .node-badge { background: #fefcbf; color: #744210; }
+        .option-edit-row {
+            display: grid; grid-template-columns: 1fr 220px 36px; gap: 8px; align-items: center;
+            background: #f8fafc; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 6px;
+        }
+        .btn-del-sm { background: #fff5f5; border: 1px solid #fed7d7; color: #e53e3e; height: 30px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+
+        /* iframeコード表示カード */
+        .embed-code-box {
+            width: 100%; font-family: monospace; font-size: 12px;
+            background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 4px;
+            padding: 10px; height: 68px; resize: none;
+        }
+    </style>
+</head>
+<body>
+
+<header id="top-header">
+    <div class="header-left">
+        <a href="admin.php" class="brand-logo">
+            <span class="icon-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            </span>
+            <span>TC Plus</span>
+        </a>
+        <ul class="top-nav">
+            <li class="active"><a href="admin_bot.php">チャット</a></li>
+            <li class="disabled"><a href="#" onclick="return false;">訪問者</a></li>
+            <li class="disabled"><a href="#" onclick="return false;">履歴</a></li>
+            <li><a href="admin.php">チケット</a></li>
+            <li class="disabled"><a href="#" onclick="return false;">レポート</a></li>
+        </ul>
+    </div>
+    <div class="header-right">
+        <span style="font-size:12px; font-weight:bold; color:#333;"><?php echo htmlspecialchars($admin_name, ENT_QUOTES, 'UTF-8'); ?></span>
+        <a href="logout.php" class="logout-link">ログアウト</a>
+    </div>
+</header>
+
+<div class="layout-wrapper">
+    <aside class="sidebar">
+        <div class="side-group-title" style="margin-top:2px;">チャット設定</div>
+        <ul class="side-menu" id="bot-side-tabs">
+            <li class="active" data-tab="tab-design"><a><span>🎨 デザイン・起動ボタン</span></a></li>
+            <li data-tab="tab-tree"><a><span>🌲 ツリーエディタ（シナリオ）</span></a></li>
+            <li data-tab="tab-func"><a><span>⚙️ 機能・営業時間・埋め込み</span></a></li>
+        </ul>
+        <?php if ($is_admin): ?>
+        <div class="side-group-title">共通設定</div>
+        <ul class="side-menu">
+            <li><a href="admin_sites.php"><span>🌐 サイト管理</span></a></li>
+            <li><a href="admin_users.php"><span>👥 担当者管理</span></a></li>
+        </ul>
+        <?php endif; ?>
+    </aside>
+
+    <main class="main-content">
+        <!-- 対象サイト選択＆保存バー -->
+        <div class="top-bar-controls">
+            <div class="site-selector-group">
+                <span style="font-weight:bold; color:#2d3748;">設定対象サイト：</span>
+                <select id="select-target-site" class="form-control" style="min-width:220px; font-weight:bold;"></select>
+                <label style="display:inline-flex; align-items:center; gap:6px; margin-left:12px; cursor:pointer; font-weight:bold;">
+                    <input type="checkbox" id="bot-enabled" checked> チャットボットを有効にする
+                </label>
+            </div>
+            <?php if ($is_admin): ?>
+            <button type="button" class="btn-primary" id="btn-save-bot">設定を保存する</button>
+            <?php else: ?>
+            <span style="font-size:12px; color:#718096;">※閲覧専用モード（設定変更は管理者権限が必要です）</span>
+            <?php endif; ?>
+        </div>
+
+        <!-- タブ1：デザイン・起動ボタン設定 -->
+        <div class="tab-panel active" id="tab-design">
+            <div class="design-grid">
+                <div>
+                    <div class="card-box">
+                        <div class="card-title">基本デザイン・ヘッダー設定</div>
+                        <div style="display:grid; grid-template-columns:140px 1fr; gap:12px;">
+                            <div class="form-group">
+                                <label>テーマカラー</label>
+                                <input type="color" id="bot-theme-color" value="#28a745" style="width:100%; height:36px; border:1px solid #cbd5e0; border-radius:4px; cursor:pointer;">
+                            </div>
+                            <div class="form-group">
+                                <label>ヘッダータイトル</label>
+                                <input type="text" id="bot-header-title" class="form-control" style="width:100%;" value="サポートチャット">
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div class="form-group">
+                                <label>サブタイトル</label>
+                                <input type="text" id="bot-header-subtitle" class="form-control" style="width:100%;" value="ご質問をお選びください">
+                            </div>
+                            <div class="form-group">
+                                <label>ボットアイコン</label>
+                                <select id="bot-icon-type" class="form-control" style="width:100%;">
+                                    <option value="operator">オペレーター（ヘッドセット）</option>
+                                    <option value="robot">チャットボット（ロボット）</option>
+                                    <option value="chat">吹き出しアイコン</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-box">
+                        <div class="card-title">折りたたみ時の起動ボタン＆アイキャッチャー設定</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div class="form-group">
+                                <label>起動ボタンの形状</label>
+                                <select id="bot-launcher-type" class="form-control" style="width:100%;">
+                                    <option value="bar">バー型（テキスト表示・推奨）</option>
+                                    <option value="circle">丸型アイコンのみ</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>起動バーの表示テキスト</label>
+                                <input type="text" id="bot-launcher-text" class="form-control" style="width:100%;" value="お問い合わせはこちらをクリック">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="bot-eyecatcher-enabled" checked>
+                                起動ボタンの上に「アイキャッチャー画像」を表示する
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label>アイキャッチャー画像の指定（空欄の場合は標準のスマホ案内イラストを使用）</label>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <input type="text" id="bot-eyecatcher-url" class="form-control" style="flex:1;" placeholder="画像URL または 右のボタンからアップロード">
+                                <input type="file" id="eyecatcher-file-input" accept="image/*" style="display:none;">
+                                <button type="button" class="btn-navy" id="btn-upload-eyecatcher">画像アップロード</button>
+                                <button type="button" class="btn-navy" style="background:#718096;" id="btn-clear-eyecatcher">標準に戻す</button>
+                            </div>
+                            <div class="form-note">※PNG / JPG / GIF / WebP（2MB以内）をアップロードできます。</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：ライブプレビュー -->
+                <div class="preview-sticky">
+                    <div class="preview-frame-box">
+                        <div class="preview-bar">
+                            <span>📱 実際のサイト表示プレビュー（操作可能）</span>
+                            <button type="button" id="btn-reload-preview" style="background:#4a5568; color:#fff; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">再読込</button>
+                        </div>
+                        <iframe id="bot-preview-iframe" class="preview-iframe" src="about:blank"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- タブ2：ツリーエディタ（シナリオ分岐） -->
+        <div class="tab-panel" id="tab-tree">
+            <div class="card-box">
+                <div class="tree-toolbar">
+                    <div>
+                        <div style="font-size:16px; font-weight:bold; color:#2d3748;">ツリーエディタ（会話シナリオ分岐設定）</div>
+                        <div style="font-size:12px; color:#718096;">「最初の挨拶（node_start）」から始まり、選択肢ボタンごとに次の発言や「お問い合わせ受付フォーム」へ分岐します。</div>
+                    </div>
+                    <button type="button" class="btn-primary" id="btn-add-node">＋ 新しい分岐ステップを追加</button>
+                </div>
+
+                <div class="tree-nodes-list" id="tree-nodes-container"></div>
+            </div>
+        </div>
+
+        <!-- タブ3：機能・営業時間・iframe埋め込みコード -->
+        <div class="tab-panel" id="tab-func">
+            <div class="card-box">
+                <div class="card-title">HTML埋め込み用 iframe コード（右下フローティング表示）</div>
+                <div class="form-group">
+                    <label>① 標準 iframe 埋め込みコード（スクリプト不可のサイトにも対応）</label>
+                    <textarea id="bot-iframe-code" class="embed-code-box" readonly onclick="this.select();"></textarea>
+                    <div class="form-note">※ホームページの &lt;/body&gt; 直前などに貼り付けるだけで、画面右下にチャットボットが固定表示されます。</div>
+                </div>
+            </div>
+
+            <div class="card-box">
+                <div class="card-title">入力・自動展開・営業時間外メッセージ設定</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                    <div class="form-group">
+                        <label>初回アクセス時の自動オープン（秒数指定）</label>
+                        <input type="number" id="bot-auto-open" class="form-control" style="width:100%;" min="0" max="120" value="0">
+                        <div class="form-note">※「0」の場合は自動展開せず、折りたたみ状態（アイキャッチャー＋起動バー）で待機します。</div>
+                    </div>
+                    <div class="form-group">
+                        <label>フリーワード入力欄の表示</label>
+                        <select id="bot-allow-free-input" class="form-control" style="width:100%;">
+                            <option value="1">表示する（訪問者が自由にテキスト送信可能）</option>
+                            <option value="0">非表示にする（選択肢ボタンのみで進行）</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>フリーワード送信時の定型応答（フォールバックメッセージ）</label>
+                    <textarea id="bot-fallback-message" class="form-control" style="width:100%; height:64px;"></textarea>
+                </div>
+
+                <div class="form-group" style="border-top:1px solid #e2e8f0; padding-top:14px;">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="checkbox" id="bot-schedule-enabled"> 営業時間外メッセージを有効にする
+                    </label>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                        <label>営業開始時刻</label>
+                        <input type="time" id="bot-schedule-start" class="form-control" style="width:100%;" value="09:00">
+                    </div>
+                    <div class="form-group">
+                        <label>営業終了時刻</label>
+                        <input type="time" id="bot-schedule-end" class="form-control" style="width:100%;" value="18:00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>営業時間外の冒頭案内メッセージ</label>
+                    <textarea id="bot-off-hours-message" class="form-control" style="width:100%; height:64px;"></textarea>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = <?php echo json_encode($csrf_token); ?>;
+    const baseUrl   = <?php echo json_encode($base_url, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+    let currentSiteId = '';
+    let treeNodes = [];
+
+    function esc(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    function updateEmbedCode() {
+        const code = `<iframe src="${baseUrl}/bot.php?site=${encodeURIComponent(currentSiteId)}" style="position:fixed; bottom:0; right:16px; width:390px; height:580px; max-width:95vw; max-height:88vh; border:none; z-index:99999; background:transparent;" allowtransparency="true"></iframe>`;
+        document.getElementById('bot-iframe-code').value = code;
+    }
+
+    function reloadPreview() {
+        const iframe = document.getElementById('bot-preview-iframe');
+        iframe.src = `bot.php?site=${encodeURIComponent(currentSiteId)}&_t=${Date.now()}`;
+    }
+
+    function renderTreeEditor() {
+        const container = document.getElementById('tree-nodes-container');
+        const nodeOptionsHtml = (selectedId) => {
+            return '<option value="">（分岐先なし・終了）</option>' +
+                treeNodes.map(n => `<option value="${esc(n.id)}" ${n.id === selectedId ? 'selected' : ''}>${esc(n.title)} (${esc(n.id)})</option>`).join('');
+        };
+
+        container.innerHTML = treeNodes.map((node, idx) => {
+            const isStart = (node.id === 'node_start');
+            const isForm  = (node.action_type === 'form');
+            const cardCls = isStart ? 'is-start' : (isForm ? 'is-form' : '');
+            const badgeText = isStart ? 'スタート地点' : (isForm ? 'チケット自動起票フォーム' : `ステップ #${idx + 1}`);
+
+            const optionsRows = (node.options || []).map((opt, oIdx) => `
+                <div class="option-edit-row">
+                    <input type="text" class="form-control opt-label" data-nidx="${idx}" data-oidx="${oIdx}" value="${esc(opt.label)}" placeholder="選択肢ボタンの文言">
+                    <select class="form-control opt-next" data-nidx="${idx}" data-oidx="${oIdx}">${nodeOptionsHtml(opt.next_node_id)}</select>
+                    <button type="button" class="btn-del-sm btn-del-opt" data-nidx="${idx}" data-oidx="${oIdx}" title="選択肢を削除">×</button>
+                </div>
+            `).join('');
+
+            return `
+            <div class="tree-node-card ${cardCls}">
+                <div class="node-header">
+                    <div style="display:flex; align-items:center; gap:10px; flex:1;">
+                        <span class="node-badge">${badgeText}</span>
+                        <input type="text" class="form-control node-title" data-nidx="${idx}" value="${esc(node.title)}" style="font-weight:bold; width:260px;" placeholder="ステップ管理名">
+                        <select class="form-control node-action-type" data-nidx="${idx}" style="width:220px;">
+                            <option value="options" ${node.action_type === 'options' ? 'selected' : ''}>通常メッセージ＋選択肢分岐</option>
+                            <option value="form" ${node.action_type === 'form' ? 'selected' : ''}>お問い合わせ受付フォーム表示</option>
+                        </select>
+                    </div>
+                    ${!isStart ? `<button type="button" class="btn-del-sm btn-del-node" data-nidx="${idx}" style="padding:0 10px;">削除</button>` : ''}
+                </div>
+
+                <div class="form-group">
+                    <label>ボットの発言メッセージ</label>
+                    <textarea class="form-control node-message" data-nidx="${idx}" style="width:100%; height:68px;">${esc(node.message)}</textarea>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>外部リンクボタン文言（任意）</label>
+                        <input type="text" class="form-control node-link-label" data-nidx="${idx}" value="${esc(node.link_label || '')}" placeholder="例：公式サイトを開く">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>外部リンク先URL（任意）</label>
+                        <input type="url" class="form-control node-link-url" data-nidx="${idx}" value="${esc(node.link_url || '')}" placeholder="https://...">
+                    </div>
+                </div>
+
+                ${node.action_type !== 'form' ? `
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label style="font-weight:bold; font-size:12px; color:#4a5568;">選択肢ボタン（クリック時の分岐先）</label>
+                        <button type="button" class="btn-navy btn-add-opt" data-nidx="${idx}" style="padding:4px 10px; font-size:11px;">＋ 選択肢を追加</button>
+                    </div>
+                    ${optionsRows || '<div style="font-size:11px; color:#a0aec0;">選択肢はありません</div>'}
+                </div>` : '<div style="font-size:12px; color:#9c4221; background:#fffaf0; padding:8px 12px; border-radius:4px;">※このステップに到達すると、チャット内に「お名前・メール・件名・内容」入力フォームが表示され、送信時に既存チケット管理へ自動登録されます。</div>'}
+            </div>`;
+        }).join('');
+    }
+
+    async function loadBotSetting(siteId = '') {
+        const url = 'bot_api.php?action=admin_get' + (siteId ? '&site_id=' + encodeURIComponent(siteId) : '');
+        const res = await fetch(url, { cache: 'no-store' });
+        if (res.status === 401) {
+            window.location.replace('login.php');
+            return;
+        }
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.error || '読み込みエラー');
+            return;
+        }
+
+        const sel = document.getElementById('select-target-site');
+        sel.innerHTML = (data.sites || []).map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+
+        const st = data.setting;
+        currentSiteId = st.site_id;
+        sel.value = currentSiteId;
+
+        document.getElementById('bot-enabled').checked            = (Number(st.enabled) === 1);
+        document.getElementById('bot-theme-color').value          = st.theme_color || '#28a745';
+        document.getElementById('bot-header-title').value         = st.header_title || '';
+        document.getElementById('bot-header-subtitle').value      = st.header_subtitle || '';
+        document.getElementById('bot-icon-type').value            = st.bot_icon_type || 'operator';
+        document.getElementById('bot-launcher-type').value        = st.launcher_type || 'bar';
+        document.getElementById('bot-launcher-text').value        = st.launcher_text || '';
+        document.getElementById('bot-eyecatcher-enabled').checked = (Number(st.eyecatcher_enabled) === 1);
+        document.getElementById('bot-eyecatcher-url').value       = st.eyecatcher_url || '';
+        document.getElementById('bot-auto-open').value            = st.auto_open_seconds || 0;
+        document.getElementById('bot-allow-free-input').value     = String(st.allow_free_input ?? 1);
+        document.getElementById('bot-fallback-message').value     = st.fallback_message || '';
+        document.getElementById('bot-schedule-enabled').checked   = (Number(st.schedule_enabled) === 1);
+        document.getElementById('bot-schedule-start').value       = st.schedule_start || '09:00';
+        document.getElementById('bot-schedule-end').value         = st.schedule_end || '18:00';
+        document.getElementById('bot-off-hours-message').value    = st.off_hours_message || '';
+
+        treeNodes = Array.isArray(st.tree) ? st.tree : [];
+        renderTreeEditor();
+        updateEmbedCode();
+        reloadPreview();
+    }
+
+    // サイドタブ切替
+    document.querySelectorAll('#bot-side-tabs li').forEach(li => {
+        li.addEventListener('click', function() {
+            document.querySelectorAll('#bot-side-tabs li').forEach(x => x.classList.remove('active'));
+            this.classList.add('active');
+            const target = this.dataset.tab;
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(target).classList.add('active');
+        });
+    });
+
+    document.getElementById('select-target-site').addEventListener('change', function() {
+        loadBotSetting(this.value);
+    });
+
+    document.getElementById('btn-reload-preview').addEventListener('click', reloadPreview);
+
+    // ツリーエディタ操作
+    document.getElementById('btn-add-node').addEventListener('click', function() {
+        const newId = 'node_' + Math.random().toString(36).slice(2, 8);
+        treeNodes.push({
+            id: newId,
+            title: '新しい案内ステップ',
+            message: '案内メッセージを入力してください。',
+            action_type: 'options',
+            options: [{ label: '最初のメニューに戻る', next_node_id: 'node_start' }],
+            link_label: '',
+            link_url: ''
+        });
+        renderTreeEditor();
+    });
+
+    document.addEventListener('input', function(e) {
+        const idx = e.target.dataset.nidx;
+        if (idx === undefined) return;
+        const node = treeNodes[Number(idx)];
+        if (!node) return;
+
+        if (e.target.classList.contains('node-title')) node.title = e.target.value;
+        if (e.target.classList.contains('node-message')) node.message = e.target.value;
+        if (e.target.classList.contains('node-link-label')) node.link_label = e.target.value;
+        if (e.target.classList.contains('node-link-url')) node.link_url = e.target.value;
+        if (e.target.classList.contains('opt-label')) {
+            const oIdx = Number(e.target.dataset.oidx);
+            if (node.options[oIdx]) node.options[oIdx].label = e.target.value;
+        }
+    });
+
+    document.addEventListener('change', function(e) {
+        const idx = e.target.dataset.nidx;
+        if (idx === undefined) return;
+        const node = treeNodes[Number(idx)];
+        if (!node) return;
+
+        if (e.target.classList.contains('node-action-type')) {
+            node.action_type = e.target.value;
+            renderTreeEditor();
+        }
+        if (e.target.classList.contains('opt-next')) {
+            const oIdx = Number(e.target.dataset.oidx);
+            if (node.options[oIdx]) node.options[oIdx].next_node_id = e.target.value;
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-add-opt')) {
+            const idx = Number(e.target.dataset.nidx);
+            treeNodes[idx].options = treeNodes[idx].options || [];
+            treeNodes[idx].options.push({ label: '新しい選択肢', next_node_id: 'node_start' });
+            renderTreeEditor();
+        }
+        if (e.target.classList.contains('btn-del-opt')) {
+            const idx = Number(e.target.dataset.nidx);
+            const oIdx = Number(e.target.dataset.oidx);
+            treeNodes[idx].options.splice(oIdx, 1);
+            renderTreeEditor();
+        }
+        if (e.target.classList.contains('btn-del-node')) {
+            const idx = Number(e.target.dataset.nidx);
+            if (!confirm('このステップを削除しますか？')) return;
+            treeNodes.splice(idx, 1);
+            renderTreeEditor();
+        }
+    });
+
+    // アイキャッチャー画像アップロード
+    const fileInput = document.getElementById('eyecatcher-file-input');
+    document.getElementById('btn-upload-eyecatcher').addEventListener('click', () => fileInput.click());
+    document.getElementById('btn-clear-eyecatcher').addEventListener('click', () => {
+        document.getElementById('bot-eyecatcher-url').value = '';
+    });
+    fileInput.addEventListener('change', async function() {
+        if (!this.files || !this.files[0]) return;
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        fd.append('action', 'upload_eyecatcher');
+        fd.append('eyecatcher_file', this.files[0]);
+
+        const res = await fetch('bot_api.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('bot-eyecatcher-url').value = data.url;
+            alert('画像をアップロードしました。「設定を保存する」を押すとプレビューに反映されます。');
+        } else {
+            alert(data.error || 'アップロードに失敗しました');
+        }
+    });
+
+    // 保存処理
+    const btnSave = document.getElementById('btn-save-bot');
+    if (btnSave) {
+        btnSave.addEventListener('click', async function() {
+            btnSave.disabled = true;
+            btnSave.textContent = '保存中...';
+
+            try {
+                const fd = new FormData();
+                fd.append('csrf_token', csrfToken);
+                fd.append('action', 'admin_save');
+                fd.append('site_id', currentSiteId);
+                if (document.getElementById('bot-enabled').checked) fd.append('enabled', '1');
+                fd.append('theme_color', document.getElementById('bot-theme-color').value);
+                fd.append('header_title', document.getElementById('bot-header-title').value);
+                fd.append('header_subtitle', document.getElementById('bot-header-subtitle').value);
+                fd.append('bot_icon_type', document.getElementById('bot-icon-type').value);
+                fd.append('launcher_type', document.getElementById('bot-launcher-type').value);
+                fd.append('launcher_text', document.getElementById('bot-launcher-text').value);
+                if (document.getElementById('bot-eyecatcher-enabled').checked) fd.append('eyecatcher_enabled', '1');
+                fd.append('eyecatcher_url', document.getElementById('bot-eyecatcher-url').value);
+                fd.append('auto_open_seconds', document.getElementById('bot-auto-open').value);
+                fd.append('allow_free_input', document.getElementById('bot-allow-free-input').value);
+                fd.append('fallback_message', document.getElementById('bot-fallback-message').value);
+                if (document.getElementById('bot-schedule-enabled').checked) fd.append('schedule_enabled', '1');
+                fd.append('schedule_start', document.getElementById('bot-schedule-start').value);
+                fd.append('schedule_end', document.getElementById('bot-schedule-end').value);
+                fd.append('off_hours_message', document.getElementById('bot-off-hours-message').value);
+                fd.append('tree_json', JSON.stringify(treeNodes));
+
+                const res = await fetch('bot_api.php', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    reloadPreview();
+                    alert('チャットボット設定を保存しました！');
+                } else {
+                    alert(data.error || '保存に失敗しました');
+                }
+            } finally {
+                btnSave.disabled = false;
+                btnSave.textContent = '設定を保存する';
+            }
+        });
+    }
+
+    loadBotSetting();
+});
+</script>
+</body>
+</html>

@@ -99,6 +99,7 @@ if (file_exists($config_file)) {
         .brand-logo .icon-box { background: var(--primary-blue); color: #fff; width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
         .top-nav { display: flex; height: 100%; list-style: none; gap: 6px; }
         .top-nav li a { display: flex; align-items: center; height: 100%; padding: 0 14px; text-decoration: none; color: #555; font-weight: bold; font-size: 14px; }
+        .top-nav li a:hover { color: var(--primary-blue); }
         .top-nav li.active a { color: var(--primary-blue); border-bottom: 3px solid var(--primary-blue); }
         .top-nav li.disabled a { color: #a0aec0; cursor: default; }
         .ticket-badge { background: #e53e3e; color: #fff; font-size: 11px; font-weight: bold; padding: 1px 6px; border-radius: 10px; margin-left: 5px; }
@@ -354,7 +355,7 @@ if (file_exists($config_file)) {
             <span>TC Plus</span>
         </a>
         <ul class="top-nav">
-            <li class="disabled"><a href="#" onclick="return false;">チャット</a></li>
+            <li><a href="admin_bot.php">チャット</a></li>
             <li class="disabled"><a href="#" onclick="return false;">訪問者</a></li>
             <li class="disabled"><a href="#" onclick="return false;">履歴</a></li>
             <li class="active"><a href="admin.php">チケット<span id="header-badge" class="ticket-badge" style="display:none;">0</span></a></li>
