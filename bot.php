@@ -1,10 +1,10 @@
 <?php
-// 外部サイトへのiframe埋め込みを許可（X-Frame-Optionsを制限しない）
+// 外部サイトへのiframe埋め込みを許可
 header("X-Content-Type-Options: nosniff");
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 
 $site_id = trim($_GET['site'] ?? '');
-$initial_open = !empty($_GET['open']); // 管理画面プレビュー用
+$initial_open = !empty($_GET['open']);
 if ($site_id === '') {
     http_response_code(404);
     exit;
@@ -29,7 +29,6 @@ if ($site_id === '') {
         overflow: hidden;
     }
 
-    /* 全体を右下に下揃え配置（折りたたみ時も上部は透明） */
     .widget-root {
         width: 100%; height: 100%;
         display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;
@@ -46,7 +45,6 @@ if ($site_id === '') {
     }
     .launcher-container.hidden { display: none; }
 
-    /* アイキャッチャー画像エリア */
     .eyecatcher-wrap {
         position: relative;
         margin-bottom: 8px;
@@ -69,7 +67,6 @@ if ($site_id === '') {
         filter: drop-shadow(0 4px 10px rgba(0,0,0,0.16));
     }
 
-    /* デフォルトのスマホイラスト風アイキャッチャーカード */
     .default-eyecatcher {
         background: #ffffff;
         border: 2px solid var(--theme-color);
@@ -98,7 +95,6 @@ if ($site_id === '') {
     }
     .ec-main-txt { font-size: 12px; font-weight: bold; color: #2d3748; }
 
-    /* 下部起動バー（スクリーンショット再現） */
     .launcher-bar {
         background: var(--theme-color);
         color: #ffffff;
@@ -116,7 +112,6 @@ if ($site_id === '') {
     }
     .launcher-bar:hover { filter: brightness(1.06); transform: translateY(-1px); }
 
-    /* 丸型起動ボタン（設定で選択時） */
     .launcher-circle {
         width: 60px; height: 60px; border-radius: 50%;
         background: var(--theme-color); color: #fff; border: none;
@@ -127,7 +122,7 @@ if ($site_id === '') {
     .launcher-circle:hover { transform: scale(1.05); }
 
     /* --------------------------------------------------
-       展開時チャットウィンドウ（本家ChatPlus準拠UI）
+       展開時チャットウィンドウ
        -------------------------------------------------- */
     .chat-window {
         width: 100%; height: 100%;
@@ -166,7 +161,6 @@ if ($site_id === '') {
     }
     .btn-header-icon:hover { background: rgba(255,255,255,0.32); }
 
-    /* 会話タイムライン */
     .chat-messages {
         flex: 1;
         background: #f4f7f9;
@@ -202,10 +196,15 @@ if ($site_id === '') {
         border-top-right-radius: 3px;
     }
 
-    /* 選択肢ボタン群 */
+    .kb-cat-tag {
+        display: inline-block; background: #edf2f7; color: #4a5568;
+        font-size: 10px; font-weight: bold; padding: 1px 6px; border-radius: 3px;
+        margin-bottom: 4px;
+    }
+
     .options-list {
         display: flex; flex-direction: column; gap: 6px;
-        margin-top: 6px; padding-left: 38px; max-width: 94%;
+        margin-top: 4px; padding-left: 38px; max-width: 94%;
     }
     .option-btn {
         background: #ffffff;
@@ -229,7 +228,6 @@ if ($site_id === '') {
         opacity: 0.55; cursor: default;
     }
 
-    /* チャット内ヒアリングフォーム */
     .inline-ticket-form {
         background: #ffffff; border: 1px solid #cbd5e0; border-radius: 10px;
         padding: 12px; margin-left: 38px; max-width: 88%;
@@ -249,14 +247,12 @@ if ($site_id === '') {
     }
     .itf-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    /* メンテナンス案内ボックス */
     .maint-box {
         background: #fffaf0; border: 1px solid #fbd38d; color: #9c4221;
         padding: 16px; border-radius: 8px; text-align: center; line-height: 1.65; font-size: 12.5px;
     }
     .maint-box strong { display: block; font-size: 14px; margin-bottom: 6px; color: #7b341e; }
 
-    /* 下部入力エリア */
     .chat-footer {
         background: #ffffff;
         border-top: 1px solid #e2e8f0;
@@ -297,7 +293,6 @@ if ($site_id === '') {
 </head>
 <body>
 <div class="widget-root" id="widget-root" style="display:none;">
-    <!-- 折りたたみ時（アイキャッチャー ＋ 下部起動バー） -->
     <div class="launcher-container" id="launcher-container">
         <div class="eyecatcher-wrap" id="eyecatcher-wrap" style="display:none;">
             <button type="button" class="eyecatcher-close" id="eyecatcher-close" title="閉じる">×</button>
@@ -309,7 +304,6 @@ if ($site_id === '') {
         </button>
     </div>
 
-    <!-- 展開時チャットウィンドウ -->
     <div class="chat-window hidden" id="chat-window">
         <div class="chat-header">
             <div class="header-profile">
@@ -328,7 +322,7 @@ if ($site_id === '') {
         <div class="chat-messages" id="chat-messages"></div>
 
         <form class="chat-footer" id="chat-input-form" autocomplete="off">
-            <input type="text" class="chat-input" id="chat-text-input" placeholder="メッセージを入力...">
+            <input type="text" class="chat-input" id="chat-text-input" placeholder="質問キーワードやメッセージを入力...">
             <button type="submit" class="btn-send-msg" title="送信">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
             </button>
@@ -399,11 +393,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         box.scrollTop = box.scrollHeight;
     }
 
-    function appendBotBubble(text, callback) {
+    function appendBotBubble(text, callback, categoryLabel = '') {
         const box = document.getElementById('chat-messages');
         const iconSvg = avatarSvgs[botSetting.bot_icon_type] || avatarSvgs.operator;
 
-        // タイピングアニメーション表示
         const typingEl = document.createElement('div');
         typingEl.className = 'msg-row bot';
         typingEl.innerHTML = `<div class="bot-mini-avatar">${iconSvg}</div><div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
@@ -411,12 +404,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         scrollToBottom();
 
         setTimeout(() => {
-            typingEl.querySelector('.msg-bubble').textContent = text;
+            const bubble = typingEl.querySelector('.msg-bubble');
+            if (categoryLabel) {
+                bubble.innerHTML = `<div class="kb-cat-tag">${esc(categoryLabel)}</div><div>${esc(text)}</div>`;
+            } else {
+                bubble.textContent = text;
+            }
             conversationLog.push({ sender: 'bot', text: text, time: new Date().toISOString() });
             syncLog();
             scrollToBottom();
             if (typeof callback === 'function') callback();
-        }, 420);
+        }, 380);
     }
 
     function appendUserBubble(text) {
@@ -436,6 +434,41 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
+    function appendFollowupMenu() {
+        const box = document.getElementById('chat-messages');
+        const tree = botSetting.tree || [];
+        const formNode = tree.find(n => n.action_type === 'form');
+        const optWrap = document.createElement('div');
+        optWrap.className = 'options-list';
+
+        if (formNode) {
+            const btnForm = document.createElement('button');
+            btnForm.type = 'button';
+            btnForm.className = 'option-btn';
+            btnForm.innerHTML = '<span>解決しないので問い合わせる</span><span>›</span>';
+            btnForm.addEventListener('click', () => {
+                disablePreviousOptions();
+                appendUserBubble('解決しないので問い合わせる');
+                renderNode(formNode.id);
+            });
+            optWrap.appendChild(btnForm);
+        }
+
+        const btnTop = document.createElement('button');
+        btnTop.type = 'button';
+        btnTop.className = 'option-btn';
+        btnTop.innerHTML = '<span>最初のメニューに戻る</span><span>›</span>';
+        btnTop.addEventListener('click', () => {
+            disablePreviousOptions();
+            appendUserBubble('最初のメニューに戻る');
+            renderNode('node_start');
+        });
+        optWrap.appendChild(btnTop);
+
+        box.appendChild(optWrap);
+        scrollToBottom();
+    }
+
     function renderNode(nodeId) {
         const tree = botSetting.tree || [];
         const node = tree.find(n => n.id === nodeId) || tree[0];
@@ -444,7 +477,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         appendBotBubble(node.message, () => {
             const box = document.getElementById('chat-messages');
 
-            // 外部リンクボタンがある場合
             if (node.link_url && node.link_label) {
                 const linkWrap = document.createElement('div');
                 linkWrap.className = 'options-list';
@@ -452,7 +484,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 box.appendChild(linkWrap);
             }
 
-            // 選択肢ボタンがある場合
             if (Array.isArray(node.options) && node.options.length > 0) {
                 const optWrap = document.createElement('div');
                 optWrap.className = 'options-list';
@@ -473,7 +504,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 box.appendChild(optWrap);
             }
 
-            // チャット内お問い合わせフォームアクションの場合
             if (node.action_type === 'form') {
                 renderInlineTicketForm();
             }
@@ -569,7 +599,77 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // 初期設定ロード
+    async function queryKnowledgeBase(queryText, kbId = 0) {
+        const fd = new FormData();
+        fd.append('action', 'ask_knowledge');
+        fd.append('site_id', siteId);
+        if (queryText) fd.append('query', queryText);
+        if (kbId > 0) fd.append('kb_id', String(kbId));
+
+        try {
+            const res = await fetch('bot_api.php', { method: 'POST', body: fd });
+            const data = await res.json();
+
+            if (data.success && data.mode === 'direct' && data.match) {
+                appendBotBubble(data.match.answer, () => {
+                    appendFollowupMenu();
+                }, data.match.category || 'Q&A回答');
+                return;
+            }
+
+            if (data.success && data.mode === 'candidates' && Array.isArray(data.matches) && data.matches.length > 0) {
+                appendBotBubble('近い内容のよくある質問が見つかりました。該当する項目をお選びください。', () => {
+                    const box = document.getElementById('chat-messages');
+                    const optWrap = document.createElement('div');
+                    optWrap.className = 'options-list';
+                    data.matches.forEach(m => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'option-btn';
+                        btn.innerHTML = `<span>${esc(m.question)}</span><span>›</span>`;
+                        btn.addEventListener('click', () => {
+                            disablePreviousOptions();
+                            appendUserBubble(m.question);
+                            queryKnowledgeBase('', m.id);
+                        });
+                        optWrap.appendChild(btn);
+                    });
+                    box.appendChild(optWrap);
+                    scrollToBottom();
+                });
+                return;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+
+        // ナレッジに該当しない場合はフォールバック応答＋スタートメニュー
+        const fb = botSetting.fallback_message || 'ご質問ありがとうございます。下のメニューからお選びいただくか、お問い合わせフォームをご利用ください。';
+        appendBotBubble(fb, () => {
+            const tree = botSetting.tree || [];
+            const startNode = tree.find(n => n.id === 'node_start') || tree[0];
+            if (startNode && Array.isArray(startNode.options)) {
+                const box = document.getElementById('chat-messages');
+                const optWrap = document.createElement('div');
+                optWrap.className = 'options-list';
+                startNode.options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'option-btn';
+                    btn.innerHTML = `<span>${esc(opt.label)}</span><span>›</span>`;
+                    btn.addEventListener('click', () => {
+                        disablePreviousOptions();
+                        appendUserBubble(opt.label);
+                        renderNode(opt.next_node_id);
+                    });
+                    optWrap.appendChild(btn);
+                });
+                box.appendChild(optWrap);
+                scrollToBottom();
+            }
+        });
+    }
+
     try {
         const res = await fetch('bot_api.php?action=public_config&site=' + encodeURIComponent(siteId), { cache: 'no-store' });
         const data = await res.json();
@@ -586,7 +686,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('header-subtitle').textContent = botSetting.header_subtitle || '';
         document.getElementById('header-avatar').innerHTML = avatarSvgs[botSetting.bot_icon_type] || avatarSvgs.operator;
 
-        // 起動ボタン（バー型 / 丸型）
         const launcherBtn = document.getElementById('launcher-btn');
         if (botSetting.launcher_type === 'circle') {
             launcherBtn.className = 'launcher-circle';
@@ -596,7 +695,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('launcher-btn-text').textContent = botSetting.launcher_text || 'お問い合わせはこちらをクリック';
         }
 
-        // アイキャッチャー表示設定
         if (botSetting.eyecatcher_enabled && !isMaintenance) {
             const ecWrap = document.getElementById('eyecatcher-wrap');
             const ecContent = document.getElementById('eyecatcher-content');
@@ -635,7 +733,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.error(e);
     }
 
-    // イベント登録
     document.getElementById('launcher-btn').addEventListener('click', openChatWindow);
     document.getElementById('eyecatcher-content').addEventListener('click', openChatWindow);
     document.getElementById('eyecatcher-close').addEventListener('click', function(e) {
@@ -645,7 +742,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('btn-minimize-chat').addEventListener('click', closeChatWindow);
     document.getElementById('btn-reset-chat').addEventListener('click', startConversation);
 
-    // フリーワード入力送信時（フェーズ1：キーワード簡易一致またはフォールバック誘導）
     document.getElementById('chat-input-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const input = document.getElementById('chat-text-input');
@@ -655,37 +751,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         input.value = '';
         disablePreviousOptions();
         appendUserBubble(text);
-
-        // ツリー内の選択肢ラベルやノードタイトルに一致するものがあればそこへ誘導
-        const tree = botSetting.tree || [];
-        const matchedNode = tree.find(n => n.id !== 'node_start' && (n.title.includes(text) || text.includes(n.title)));
-        if (matchedNode) {
-            renderNode(matchedNode.id);
-        } else {
-            const fb = botSetting.fallback_message || 'ご質問ありがとうございます。下のメニューからお選びいただくか、お問い合わせフォームをご利用ください。';
-            appendBotBubble(fb, () => {
-                const startNode = tree.find(n => n.id === 'node_start') || tree[0];
-                if (startNode && Array.isArray(startNode.options)) {
-                    const box = document.getElementById('chat-messages');
-                    const optWrap = document.createElement('div');
-                    optWrap.className = 'options-list';
-                    startNode.options.forEach(opt => {
-                        const btn = document.createElement('button');
-                        btn.type = 'button';
-                        btn.className = 'option-btn';
-                        btn.innerHTML = `<span>${esc(opt.label)}</span><span>›</span>`;
-                        btn.addEventListener('click', () => {
-                            disablePreviousOptions();
-                            appendUserBubble(opt.label);
-                            renderNode(opt.next_node_id);
-                        });
-                        optWrap.appendChild(btn);
-                    });
-                    box.appendChild(optWrap);
-                    scrollToBottom();
-                }
-            });
-        }
+        queryKnowledgeBase(text, 0);
     });
 });
 </script>

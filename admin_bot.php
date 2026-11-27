@@ -88,7 +88,7 @@ $base_url = $protocol . $domain . $dir;
         .layout-wrapper { display: flex; padding-top: 54px; min-height: 100vh; }
 
         /* 左サイドバー */
-        .sidebar { width: 185px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 16px 0; position: fixed; top: 54px; bottom: 0; left: 0; overflow-y: auto; }
+        .sidebar { width: 195px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 16px 0; position: fixed; top: 54px; bottom: 0; left: 0; overflow-y: auto; }
         .side-group-title { font-size: 11px; color: #a0aec0; font-weight: bold; padding: 0 18px; margin-bottom: 4px; margin-top: 16px; }
         .side-menu { list-style: none; }
         .side-menu li a { display: flex; align-items: center; gap: 10px; padding: 10px 18px; color: #4a5568; text-decoration: none; font-size: 13px; cursor: pointer; }
@@ -96,7 +96,7 @@ $base_url = $protocol . $domain . $dir;
         .side-menu li.active a { background: #e2ecf7; color: #1a365d; font-weight: bold; border-left: 3px solid var(--primary-blue); }
 
         /* メインエリア */
-        .main-content { flex: 1; margin-left: 185px; padding: 22px 28px; }
+        .main-content { flex: 1; margin-left: 195px; padding: 22px 28px; }
         .top-bar-controls {
             background: #fff; border: 1px solid var(--border-color); border-radius: 6px;
             padding: 14px 18px; margin-bottom: 18px;
@@ -105,14 +105,15 @@ $base_url = $protocol . $domain . $dir;
         .site-selector-group { display: flex; align-items: center; gap: 10px; }
         .form-control { padding: 7px 10px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px; background: #fff; }
         .form-control:focus { outline: none; border-color: var(--primary-blue); }
-        .btn-primary { background: var(--primary-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .btn-primary { background: var(--primary-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
         .btn-primary:hover { background: #2188c4; }
-        .btn-navy { background: var(--navy-btn); color: #fff; border: none; padding: 7px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .btn-navy { background: var(--navy-btn); color: #fff; border: none; padding: 7px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+        .btn-navy:hover { background: var(--navy-btn-hover); }
 
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
-        /* デザイン設定2カラム（左：設定フォーム / 右：リアルタイムプレビュー） */
+        /* デザイン設定2カラム */
         .design-grid { display: grid; grid-template-columns: 1fr 410px; gap: 20px; align-items: start; }
         .card-box { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 20px; margin-bottom: 16px; }
         .card-title { font-size: 15px; font-weight: bold; color: #2d3748; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 16px; }
@@ -132,7 +133,7 @@ $base_url = $protocol . $domain . $dir;
         }
         .preview-iframe { width: 100%; flex: 1; border: none; background: transparent; }
 
-        /* ツリーエディタ（視覚的シナリオ編集） */
+        /* ツリーエディタ */
         .tree-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
         .tree-nodes-list { display: flex; flex-direction: column; gap: 16px; }
         .tree-node-card {
@@ -151,7 +152,32 @@ $base_url = $protocol . $domain . $dir;
         }
         .btn-del-sm { background: #fff5f5; border: 1px solid #fed7d7; color: #e53e3e; height: 30px; border-radius: 4px; cursor: pointer; font-weight: bold; }
 
-        /* iframeコード表示カード */
+        /* ナレッジベース（Q&A）テーブル・カード */
+        .kb-toolbar {
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;
+            margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);
+        }
+        .kb-item {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 16px;
+            margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;
+        }
+        .kb-item:hover { border-color: #cbd5e0; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+        .kb-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .kb-cat-pill { background: #ebf8ff; color: #2b6cb0; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 4px; }
+        .kb-kw-pill { background: #edf2f7; color: #4a5568; font-size: 11px; padding: 2px 7px; border-radius: 4px; }
+        .kb-hit-pill { background: #f0fff4; color: #276749; font-size: 11px; padding: 2px 7px; border-radius: 4px; border: 1px solid #c6f6d5; }
+        .kb-q { font-size: 14px; font-weight: bold; color: #2d3748; margin-bottom: 6px; }
+        .kb-a { font-size: 12.5px; color: #4a5568; white-space: pre-wrap; line-height: 1.55; background: #f8fafc; padding: 8px 10px; border-radius: 4px; }
+
+        /* モーダル */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal-dialog { background: #fff; width: 540px; max-width: 94vw; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
+        .modal-header { padding: 14px 18px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 15px; }
+        .modal-body { padding: 18px; max-height: 75vh; overflow-y: auto; }
+        .modal-footer { padding: 12px 18px; background: #f8fafc; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 8px; }
+        .btn-cancel { background: #fff; border: 1px solid #cbd5e0; color: #4a5568; padding: 7px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+
         .embed-code-box {
             width: 100%; font-family: monospace; font-size: 12px;
             background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 4px;
@@ -189,6 +215,7 @@ $base_url = $protocol . $domain . $dir;
         <ul class="side-menu" id="bot-side-tabs">
             <li class="active" data-tab="tab-design"><a><span>🎨 デザイン・起動ボタン</span></a></li>
             <li data-tab="tab-tree"><a><span>🌲 ツリーエディタ（シナリオ）</span></a></li>
+            <li data-tab="tab-kb"><a><span>📚 ナレッジベース（Q&A）</span></a></li>
             <li data-tab="tab-func"><a><span>⚙️ 機能・営業時間・埋め込み</span></a></li>
         </ul>
         <?php if ($is_admin): ?>
@@ -201,7 +228,6 @@ $base_url = $protocol . $domain . $dir;
     </aside>
 
     <main class="main-content">
-        <!-- 対象サイト選択＆保存バー -->
         <div class="top-bar-controls">
             <div class="site-selector-group">
                 <span style="font-weight:bold; color:#2d3748;">設定対象サイト：</span>
@@ -285,7 +311,6 @@ $base_url = $protocol . $domain . $dir;
                     </div>
                 </div>
 
-                <!-- 右側：ライブプレビュー -->
                 <div class="preview-sticky">
                     <div class="preview-frame-box">
                         <div class="preview-bar">
@@ -313,7 +338,33 @@ $base_url = $protocol . $domain . $dir;
             </div>
         </div>
 
-        <!-- タブ3：機能・営業時間・iframe埋め込みコード -->
+        <!-- タブ3：ナレッジベース（Q&A自動応答管理・外部AI不使用） -->
+        <div class="tab-panel" id="tab-kb">
+            <div class="card-box">
+                <div class="kb-toolbar">
+                    <div>
+                        <div style="font-size:16px; font-weight:bold; color:#2d3748;">ナレッジベース（Q&A自動マッチング応答）</div>
+                        <div style="font-size:12px; color:#718096;">訪問者がチャット欄にフリーワードを入力した際、登録した質問文・関連キーワードをもとに自動回答します（外部AI API不使用）。</div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn-navy" id="btn-kb-sample">サンプルQ&A自動登録</button>
+                        <button type="button" class="btn-navy" id="btn-kb-import">CSVインポート</button>
+                        <input type="file" id="kb-csv-input" accept=".csv" style="display:none;">
+                        <a href="#" id="btn-kb-export" class="btn-navy">CSV出力</a>
+                        <button type="button" class="btn-primary" id="btn-kb-add">＋ Q&Aを追加</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:14px; display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="kb-search-input" class="form-control" style="width:320px;" placeholder="質問文・キーワード・回答文で絞り込み...">
+                    <span id="kb-count-label" style="font-size:12px; color:#718096;">0 件</span>
+                </div>
+
+                <div id="kb-list-container"></div>
+            </div>
+        </div>
+
+        <!-- タブ4：機能・営業時間・iframe埋め込みコード -->
         <div class="tab-panel" id="tab-func">
             <div class="card-box">
                 <div class="card-title">HTML埋め込み用 iframe コード（右下フローティング表示）</div>
@@ -333,16 +384,16 @@ $base_url = $protocol . $domain . $dir;
                         <div class="form-note">※「0」の場合は自動展開せず、折りたたみ状態（アイキャッチャー＋起動バー）で待機します。</div>
                     </div>
                     <div class="form-group">
-                        <label>フリーワード入力欄の表示</label>
+                        <label>フリーワード入力欄の表示（ナレッジベース検索）</label>
                         <select id="bot-allow-free-input" class="form-control" style="width:100%;">
-                            <option value="1">表示する（訪問者が自由にテキスト送信可能）</option>
+                            <option value="1">表示する（フリーワード入力でナレッジベースQ&A検索）</option>
                             <option value="0">非表示にする（選択肢ボタンのみで進行）</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>フリーワード送信時の定型応答（フォールバックメッセージ）</label>
+                    <label>ナレッジベースに該当がない時の定型応答（フォールバックメッセージ）</label>
                     <textarea id="bot-fallback-message" class="form-control" style="width:100%; height:64px;"></textarea>
                 </div>
 
@@ -370,12 +421,52 @@ $base_url = $protocol . $domain . $dir;
     </main>
 </div>
 
+<!-- モーダル：ナレッジベース（Q&A）追加・編集 -->
+<div class="modal-overlay" id="modal-kb">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span id="modal-kb-title">Q&Aを追加</span>
+            <span class="modal-close" style="cursor:pointer;">×</span>
+        </div>
+        <form id="form-kb">
+            <div class="modal-body">
+                <input type="hidden" id="kb-id" value="0">
+                <div class="form-group">
+                    <label>カテゴリ（任意）</label>
+                    <input type="text" id="kb-category" class="form-control" style="width:100%;" placeholder="例：営業時間・アクセス、ご予約について">
+                </div>
+                <div class="form-group">
+                    <label>質問文 *</label>
+                    <input type="text" id="kb-question" class="form-control" style="width:100%;" required placeholder="例：営業時間を教えてください">
+                </div>
+                <div class="form-group">
+                    <label>関連キーワード（カンマ区切り・複数入力推奨）</label>
+                    <input type="text" id="kb-keywords" class="form-control" style="width:100%;" placeholder="例：営業時間,何時まで,定休日,休み,オープン">
+                    <div class="form-note">※お客様が入力しそうな単語や言い換え表現をカンマ区切りで入れておくとヒット率が大幅に上がります。</div>
+                </div>
+                <div class="form-group">
+                    <label>回答文 *</label>
+                    <textarea id="kb-answer" class="form-control" style="width:100%; height:130px;" required placeholder="ボットが自動返信する回答テキストを入力してください"></textarea>
+                </div>
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="kb-enabled" checked> このQ&Aを有効にする
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel modal-close">キャンセル</button>
+                <button type="submit" class="btn-primary">保存する</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const csrfToken = <?php echo json_encode($csrf_token); ?>;
     const baseUrl   = <?php echo json_encode($base_url, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
     let currentSiteId = '';
     let treeNodes = [];
+    let kbList = [];
 
     function esc(str) {
         if (str === null || str === undefined) return '';
@@ -385,11 +476,51 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateEmbedCode() {
         const code = `<iframe src="${baseUrl}/bot.php?site=${encodeURIComponent(currentSiteId)}" style="position:fixed; bottom:0; right:16px; width:390px; height:580px; max-width:95vw; max-height:88vh; border:none; z-index:99999; background:transparent;" allowtransparency="true"></iframe>`;
         document.getElementById('bot-iframe-code').value = code;
+        document.getElementById('btn-kb-export').href = `bot_api.php?action=kb_export_csv&site_id=${encodeURIComponent(currentSiteId)}`;
     }
 
     function reloadPreview() {
         const iframe = document.getElementById('bot-preview-iframe');
         iframe.src = `bot.php?site=${encodeURIComponent(currentSiteId)}&_t=${Date.now()}`;
+    }
+
+    function renderKnowledgeList() {
+        const filter = (document.getElementById('kb-search-input').value || '').trim().toLowerCase();
+        const filtered = kbList.filter(item => {
+            if (!filter) return true;
+            return (item.question || '').toLowerCase().includes(filter)
+                || (item.keywords || '').toLowerCase().includes(filter)
+                || (item.answer || '').toLowerCase().includes(filter)
+                || (item.category || '').toLowerCase().includes(filter);
+        });
+
+        document.getElementById('kb-count-label').textContent = `${filtered.length} 件`;
+        const container = document.getElementById('kb-list-container');
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div style="padding:36px; text-align:center; color:#718096; background:#f8fafc; border-radius:6px;">登録されているQ&Aがありません。「＋ Q&Aを追加」または「サンプルQ&A自動登録」から登録してください。</div>';
+            return;
+        }
+
+        container.innerHTML = filtered.map(item => {
+            const catBadge = item.category ? `<span class="kb-cat-pill">${esc(item.category)}</span>` : '';
+            const kwBadge  = item.keywords ? `<span class="kb-kw-pill">キーワード: ${esc(item.keywords)}</span>` : '';
+            const hitBadge = `<span class="kb-hit-pill">ヒット数: ${item.hit_count || 0}回</span>`;
+            const offBadge = Number(item.enabled) === 0 ? `<span style="background:#fed7d7; color:#9b2c2c; font-size:11px; padding:2px 6px; border-radius:4px;">無効</span>` : '';
+
+            return `
+            <div class="kb-item">
+                <div style="flex:1;">
+                    <div class="kb-meta">${catBadge}${kwBadge}${hitBadge}${offBadge}</div>
+                    <div class="kb-q">Q. ${esc(item.question)}</div>
+                    <div class="kb-a">${esc(item.answer)}</div>
+                </div>
+                <div style="display:flex; gap:6px; flex-shrink:0;">
+                    <button type="button" class="btn-navy btn-kb-edit" data-id="${item.id}">編集</button>
+                    <button type="button" class="btn-del-sm btn-kb-del" data-id="${item.id}" style="padding:0 10px;">削除</button>
+                </div>
+            </div>`;
+        }).join('');
     }
 
     function renderTreeEditor() {
@@ -493,7 +624,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('bot-off-hours-message').value    = st.off_hours_message || '';
 
         treeNodes = Array.isArray(st.tree) ? st.tree : [];
+        kbList = Array.isArray(data.knowledge) ? data.knowledge : [];
+
         renderTreeEditor();
+        renderKnowledgeList();
         updateEmbedCode();
         reloadPreview();
     }
@@ -514,6 +648,74 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.getElementById('btn-reload-preview').addEventListener('click', reloadPreview);
+    document.getElementById('kb-search-input').addEventListener('input', renderKnowledgeList);
+
+    // ナレッジベース操作
+    document.getElementById('btn-kb-add').addEventListener('click', function() {
+        document.getElementById('form-kb').reset();
+        document.getElementById('kb-id').value = '0';
+        document.getElementById('kb-enabled').checked = true;
+        document.getElementById('modal-kb-title').textContent = 'Q&Aを追加';
+        document.getElementById('modal-kb').classList.add('open');
+    });
+
+    document.getElementById('btn-kb-sample').addEventListener('click', async function() {
+        if (!confirm('現在のサイト内容に合わせた初期サンプルQ&A（4件）を自動登録しますか？')) return;
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        fd.append('action', 'kb_seed_sample');
+        fd.append('site_id', currentSiteId);
+        const res = await fetch('bot_api.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            loadBotSetting(currentSiteId);
+        } else {
+            alert(data.error || '登録に失敗しました');
+        }
+    });
+
+    const csvInput = document.getElementById('kb-csv-input');
+    document.getElementById('btn-kb-import').addEventListener('click', () => csvInput.click());
+    csvInput.addEventListener('change', async function() {
+        if (!this.files || !this.files[0]) return;
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        fd.append('action', 'kb_import_csv');
+        fd.append('site_id', currentSiteId);
+        fd.append('csv_file', this.files[0]);
+        const res = await fetch('bot_api.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        this.value = '';
+        if (data.success) {
+            alert(`${data.imported} 件のQ&Aをインポートしました！`);
+            loadBotSetting(currentSiteId);
+        } else {
+            alert(data.error || 'インポートに失敗しました');
+        }
+    });
+
+    document.getElementById('form-kb').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const fd = new FormData();
+        fd.append('csrf_token', csrfToken);
+        fd.append('action', 'kb_save');
+        fd.append('site_id', currentSiteId);
+        fd.append('id', document.getElementById('kb-id').value);
+        fd.append('category', document.getElementById('kb-category').value);
+        fd.append('question', document.getElementById('kb-question').value);
+        fd.append('keywords', document.getElementById('kb-keywords').value);
+        fd.append('answer', document.getElementById('kb-answer').value);
+        if (document.getElementById('kb-enabled').checked) fd.append('enabled', '1');
+
+        const res = await fetch('bot_api.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('modal-kb').classList.remove('open');
+            loadBotSetting(currentSiteId);
+        } else {
+            alert(data.error || '保存に失敗しました');
+        }
+    });
 
     // ツリーエディタ操作
     document.getElementById('btn-add-node').addEventListener('click', function() {
@@ -562,7 +764,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', async function(e) {
         if (e.target.classList.contains('btn-add-opt')) {
             const idx = Number(e.target.dataset.nidx);
             treeNodes[idx].options = treeNodes[idx].options || [];
@@ -580,6 +782,35 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!confirm('このステップを削除しますか？')) return;
             treeNodes.splice(idx, 1);
             renderTreeEditor();
+        }
+        if (e.target.classList.contains('btn-kb-edit')) {
+            const id = Number(e.target.dataset.id);
+            const item = kbList.find(x => Number(x.id) === id);
+            if (!item) return;
+            document.getElementById('kb-id').value = item.id;
+            document.getElementById('kb-category').value = item.category || '';
+            document.getElementById('kb-question').value = item.question || '';
+            document.getElementById('kb-keywords').value = item.keywords || '';
+            document.getElementById('kb-answer').value = item.answer || '';
+            document.getElementById('kb-enabled').checked = (Number(item.enabled) === 1);
+            document.getElementById('modal-kb-title').textContent = 'Q&Aを編集';
+            document.getElementById('modal-kb').classList.add('open');
+        }
+        if (e.target.classList.contains('btn-kb-del')) {
+            const id = Number(e.target.dataset.id);
+            if (!confirm('このQ&Aを削除してもよろしいですか？')) return;
+            const fd = new FormData();
+            fd.append('csrf_token', csrfToken);
+            fd.append('action', 'kb_delete');
+            fd.append('site_id', currentSiteId);
+            fd.append('id', String(id));
+            const res = await fetch('bot_api.php', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.success) loadBotSetting(currentSiteId);
+        }
+        const closeBtn = e.target.closest('.modal-close');
+        if (closeBtn) {
+            closeBtn.closest('.modal-overlay').classList.remove('open');
         }
     });
 
