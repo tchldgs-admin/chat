@@ -18,7 +18,7 @@ mb_language("Japanese");
 mb_internal_encoding("UTF-8");
 
 // --------------------------------------------------
-// 1. チャットボット＆ナレッジベース用テーブルの自動作成・スキーマ同期
+// 1. チャットボット用テーブルの自動作成・スキーマ同期
 // --------------------------------------------------
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS bot_settings (
@@ -51,6 +51,8 @@ try {
         site_name VARCHAR(100) NOT NULL DEFAULT '',
         visitor_name VARCHAR(100) NOT NULL DEFAULT '',
         visitor_email VARCHAR(190) NOT NULL DEFAULT '',
+        page_url VARCHAR(255) NOT NULL DEFAULT '',
+        user_agent VARCHAR(255) NOT NULL DEFAULT '',
         messages_json LONGTEXT,
         ticket_id INT NULL DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -58,6 +60,15 @@ try {
         INDEX idx_session_key (session_key),
         INDEX idx_site_id (site_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // 既存bot_logsテーブルへのカラム補完
+    $log_cols = $pdo->query("SHOW COLUMNS FROM bot_logs")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('page_url', $log_cols)) {
+        $pdo->exec("ALTER TABLE bot_logs ADD COLUMN page_url VARCHAR(255) NOT NULL DEFAULT '' AFTER visitor_email");
+    }
+    if (!in_array('user_agent', $log_cols)) {
+        $pdo->exec("ALTER TABLE bot_logs ADD COLUMN user_agent VARCHAR(255) NOT NULL DEFAULT '' AFTER page_url");
+    }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS bot_knowledge (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -188,7 +199,7 @@ function get_or_create_bot_setting($pdo, $site_id, $site_name = 'サポート') 
 }
 
 // --------------------------------------------------
-// ナレッジベース（Q&A）日本語マッチングアルゴリズム（外部AI不使用）
+// ナレッジベース（Q&A）日本語マッチングアルゴリズム
 // --------------------------------------------------
 function normalize_jp_text($str) {
     $str = mb_convert_kana((string)$str, 'asKV', 'UTF-8');
@@ -229,7 +240,6 @@ function search_knowledge_base($pdo, $site_id, $query_text) {
         $norm_a = normalize_jp_text($item['answer']);
         $raw_kws = preg_split('/[,、，\s ]+/u', (string)$item['keywords'], -1, PREG_SPLIT_NO_EMPTY);
 
-        // 1. 質問文との完全一致・部分一致
         if ($norm_q === $norm_query) {
             $score += 100;
         } elseif (mb_strlen($norm_query, 'UTF-8') >= 2 && mb_strpos($norm_q, $norm_query) !== false) {
@@ -238,7 +248,6 @@ function search_knowledge_base($pdo, $site_id, $query_text) {
             $score += 45;
         }
 
-        // 2. 登録キーワードとの一致判定（最重要）
         foreach ($raw_kws as $kw) {
             $nkw = normalize_jp_text($kw);
             if ($nkw === '') continue;
@@ -251,14 +260,12 @@ function search_knowledge_base($pdo, $site_id, $query_text) {
             }
         }
 
-        // 3. スペース区切りトークンの一致
         foreach ($query_tokens as $tok) {
             if (mb_strlen($tok, 'UTF-8') < 2) continue;
             if (mb_strpos($norm_q, $tok) !== false) $score += 18;
             if (mb_strpos($norm_a, $tok) !== false) $score += 8;
         }
 
-        // 4. 日本語2文字N-gram（バイグラム）類似度
         if (!empty($query_bigrams)) {
             $q_bigrams = make_bigrams($norm_q . ' ' . normalize_jp_text($item['keywords']));
             if (!empty($q_bigrams)) {
@@ -383,7 +390,9 @@ function send_bot_ticket_mail($to, $subject, $body, $from_email, $from_name, $si
 
 $action = $_REQUEST['action'] ?? '';
 
+// --------------------------------------------------
 // CSVエクスポート（ナレッジベース）
+// --------------------------------------------------
 if ($action === 'kb_export_csv') {
     if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
         http_response_code(401);
@@ -401,6 +410,46 @@ if ($action === 'kb_export_csv') {
     fputcsv($out, ['カテゴリ', '質問文', '関連キーワード（カンマ区切り）', '回答文', '有効(1/0)', 'ヒット数']);
     foreach ($rows as $r) {
         fputcsv($out, [$r['category'], $r['question'], $r['keywords'], $r['answer'], $r['enabled'], $r['hit_count']]);
+    }
+    fclose($out);
+    exit;
+}
+
+// --------------------------------------------------
+// CSVエクスポート（チャット履歴ログ）
+// --------------------------------------------------
+if ($action === 'logs_export_csv') {
+    if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+        http_response_code(401);
+        exit;
+    }
+    $stmt = $pdo->query("SELECT * FROM bot_logs ORDER BY updated_at DESC LIMIT 2000");
+    $rows = $stmt->fetchAll();
+
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="chat_logs_' . date('Ymd_His') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");
+    fputcsv($out, ['ログID', 'サイト名', '訪問者名', 'メールアドレス', '連携チケットID', '開始日時', '最終更新日時', '会話内容']);
+    foreach ($rows as $r) {
+        $msgs = json_decode($r['messages_json'] ?: '[]', true);
+        $conv = '';
+        if (is_array($msgs)) {
+            foreach ($msgs as $m) {
+                $prefix = ($m['sender'] ?? '') === 'bot' ? '[ボット] ' : '[訪問者] ';
+                $conv .= $prefix . str_replace(["\r", "\n"], ' ', $m['text'] ?? '') . " / ";
+            }
+        }
+        fputcsv($out, [
+            $r['id'],
+            $r['site_name'],
+            $r['visitor_name'] ?: '(匿名訪問者)',
+            $r['visitor_email'],
+            $r['ticket_id'] ? '#' . $r['ticket_id'] : 'ボット完結',
+            $r['created_at'],
+            $r['updated_at'],
+            rtrim($conv, ' / ')
+        ]);
     }
     fclose($out);
     exit;
@@ -474,7 +523,6 @@ try {
             throw new Exception('無効なサイトIDです。');
         }
 
-        // 候補ボタンが直接クリックされた場合
         if ($kb_id > 0) {
             $stmt = $pdo->prepare("SELECT id, category, question, answer FROM bot_knowledge WHERE id = ? AND site_id = ? AND enabled = 1");
             $stmt->execute([$kb_id, $site_id]);
@@ -500,7 +548,6 @@ try {
             exit;
         }
 
-        // 1位が圧倒的に高スコア、または1件のみヒットした場合は即回答
         if (count($matches) === 1 || ($matches[0]['score'] >= 55 && ($matches[0]['score'] - $matches[1]['score']) >= 20)) {
             $top = $matches[0];
             $pdo->prepare("UPDATE bot_knowledge SET hit_count = hit_count + 1 WHERE id = ?")->execute([$top['id']]);
@@ -517,7 +564,6 @@ try {
             exit;
         }
 
-        // 複数候補がある場合は選択肢として提示
         echo json_encode([
             'success' => true,
             'mode'    => 'candidates',
@@ -532,11 +578,13 @@ try {
         exit;
     }
 
-    // 3. チャット会話ログの保存
+    // 3. チャット会話ログ＆訪問者情報の保存
     if ($action === 'save_log') {
         $site_id     = trim($_POST['site_id'] ?? '');
         $session_key = trim($_POST['session_key'] ?? '');
         $messages    = $_POST['messages_json'] ?? '[]';
+        $page_url    = mb_substr(trim($_POST['page_url'] ?? ($_SERVER['HTTP_REFERER'] ?? '')), 0, 250);
+        $user_agent  = mb_substr(trim($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 250);
 
         $site = get_site_by_id($config, $site_id);
         if (!$site || $session_key === '') {
@@ -549,11 +597,11 @@ try {
         $existing = $stmt->fetch();
 
         if ($existing) {
-            $upd = $pdo->prepare("UPDATE bot_logs SET messages_json = ?, updated_at = NOW() WHERE id = ?");
-            $upd->execute([$messages, $existing['id']]);
+            $upd = $pdo->prepare("UPDATE bot_logs SET messages_json = ?, page_url = IF(? != '', ?, page_url), updated_at = NOW() WHERE id = ?");
+            $upd->execute([$messages, $page_url, $page_url, $existing['id']]);
         } else {
-            $ins = $pdo->prepare("INSERT INTO bot_logs (session_key, site_id, site_name, messages_json) VALUES (?, ?, ?, ?)");
-            $ins->execute([$session_key, $site_id, $site['name'] ?? '', $messages]);
+            $ins = $pdo->prepare("INSERT INTO bot_logs (session_key, site_id, site_name, page_url, user_agent, messages_json) VALUES (?, ?, ?, ?, ?, ?)");
+            $ins->execute([$session_key, $site_id, $site['name'] ?? '', $page_url, $user_agent, $messages]);
         }
         echo json_encode(['success' => true]);
         exit;
@@ -691,7 +739,7 @@ try {
         exit;
     }
 
-    // 6. 管理画面用：ボット設定・デザイン・ツリーシナリオ保存（管理者権限のみ）
+    // 6. 管理画面用：ボット設定・デザイン・ツリーシナリオ保存
     if ($action === 'admin_save') {
         if ($my_role !== 'admin') {
             http_response_code(403);
@@ -876,7 +924,7 @@ try {
         exit;
     }
 
-    // 11. アイキャッチャー画像のアップロード（管理者権限のみ）
+    // 11. アイキャッチャー画像のアップロード
     if ($action === 'upload_eyecatcher') {
         if ($my_role !== 'admin') {
             http_response_code(403);
@@ -919,6 +967,269 @@ try {
         echo json_encode([
             'success' => true,
             'url'     => 'uploads/' . $filename
+        ]);
+        exit;
+    }
+
+    // ==================================================
+    // フェーズ3：訪問者モニター・会話履歴一覧・レポート集計API
+    // ==================================================
+
+    // 12. 訪問者モニター一覧取得（直近24時間およびアクティブ判定）
+    if ($action === 'visitors_list') {
+        $site_id = trim($_GET['site_id'] ?? '');
+        $where = ["updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"];
+        $params = [];
+        if ($site_id !== '') {
+            $where[] = "site_id = ?";
+            $params[] = $site_id;
+        }
+
+        $sql = "SELECT * FROM bot_logs WHERE " . implode(" AND ", $where) . " ORDER BY updated_at DESC LIMIT 100";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $now = time();
+        $visitors = [];
+        $active_count = 0;
+
+        foreach ($rows as $r) {
+            $updated_ts = strtotime($r['updated_at']);
+            $diff_sec = max(0, $now - $updated_ts);
+            $is_online = ($diff_sec <= 300); // 5分以内の操作は「オンライン対応中」
+            if ($is_online) $active_count++;
+
+            $msgs = json_decode($r['messages_json'] ?: '[]', true);
+            $msg_count = is_array($msgs) ? count($msgs) : 0;
+            $last_msg = '';
+            if ($msg_count > 0) {
+                $last_item = $msgs[$msg_count - 1];
+                $last_msg = mb_strimwidth(str_replace(["\r", "\n"], ' ', $last_item['text'] ?? ''), 0, 70, '...');
+            }
+
+            $ua = $r['user_agent'] ?? '';
+            $device = (preg_match('/iPhone|Android|Mobile/i', $ua)) ? 'スマホ' : 'PC';
+
+            if ($diff_sec < 60) {
+                $ago = 'たった今';
+            } elseif ($diff_sec < 3600) {
+                $ago = floor($diff_sec / 60) . '分前';
+            } else {
+                $ago = floor($diff_sec / 3600) . '時間前';
+            }
+
+            $visitors[] = [
+                'id'            => $r['id'],
+                'session_key'   => $r['session_key'],
+                'site_name'     => $r['site_name'],
+                'visitor_name'  => $r['visitor_name'] ?: 'ゲスト訪問者 #' . $r['id'],
+                'visitor_email' => $r['visitor_email'],
+                'page_url'      => $r['page_url'],
+                'device'        => $device,
+                'is_online'     => $is_online,
+                'ago_text'      => $ago,
+                'msg_count'     => $msg_count,
+                'last_msg'      => $last_msg,
+                'ticket_id'     => $r['ticket_id'],
+                'created_at'    => $r['created_at'],
+                'updated_at'    => $r['updated_at']
+            ];
+        }
+
+        $safe_sites = array_map(function($s) {
+            return ['id' => $s['id'], 'name' => $s['name']];
+        }, $config['sites'] ?? []);
+
+        echo json_encode([
+            'success'      => true,
+            'sites'        => $safe_sites,
+            'active_count' => $active_count,
+            'visitors'     => $visitors
+        ]);
+        exit;
+    }
+
+    // 13. 会話履歴一覧取得（検索・絞り込み対応）
+    if ($action === 'logs_list') {
+        $where = [];
+        $params = [];
+
+        if (!empty($_GET['site_id'])) {
+            $where[] = "site_id = ?";
+            $params[] = trim($_GET['site_id']);
+        }
+        if (!empty($_GET['start_date'])) {
+            $where[] = "DATE(created_at) >= ?";
+            $params[] = $_GET['start_date'];
+        }
+        if (!empty($_GET['end_date'])) {
+            $where[] = "DATE(created_at) <= ?";
+            $params[] = $_GET['end_date'];
+        }
+        $result_type = $_GET['result_type'] ?? '';
+        if ($result_type === 'ticket') {
+            $where[] = "ticket_id IS NOT NULL";
+        } elseif ($result_type === 'bot_only') {
+            $where[] = "ticket_id IS NULL";
+        }
+        if (!empty($_GET['word'])) {
+            $w = '%' . trim($_GET['word']) . '%';
+            $where[] = "(visitor_name LIKE ? OR visitor_email LIKE ? OR messages_json LIKE ?)";
+            $params[] = $w;
+            $params[] = $w;
+            $params[] = $w;
+        }
+
+        $sql = "SELECT * FROM bot_logs";
+        if ($where) {
+            $sql .= " WHERE " . implode(" AND ", $where);
+        }
+        $sql .= " ORDER BY updated_at DESC LIMIT 200";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        $logs = [];
+        foreach ($rows as $r) {
+            $msgs = json_decode($r['messages_json'] ?: '[]', true);
+            if (!is_array($msgs)) $msgs = [];
+            $first_user_msg = '';
+            foreach ($msgs as $m) {
+                if (($m['sender'] ?? '') === 'user') {
+                    $first_user_msg = mb_strimwidth(str_replace(["\r", "\n"], ' ', $m['text'] ?? ''), 0, 80, '...');
+                    break;
+                }
+            }
+            if ($first_user_msg === '' && !empty($msgs)) {
+                $first_user_msg = mb_strimwidth(str_replace(["\r", "\n"], ' ', $msgs[0]['text'] ?? ''), 0, 80, '...');
+            }
+
+            $logs[] = [
+                'id'             => $r['id'],
+                'site_id'        => $r['site_id'],
+                'site_name'      => $r['site_name'],
+                'visitor_name'   => $r['visitor_name'] ?: 'ゲスト訪問者 #' . $r['id'],
+                'visitor_email'  => $r['visitor_email'],
+                'ticket_id'      => $r['ticket_id'],
+                'msg_count'      => count($msgs),
+                'summary'        => $first_user_msg ?: '(会話記録なし)',
+                'messages'       => $msgs,
+                'created_at'     => $r['created_at'],
+                'updated_at'     => $r['updated_at']
+            ];
+        }
+
+        $safe_sites = array_map(function($s) {
+            return ['id' => $s['id'], 'name' => $s['name']];
+        }, $config['sites'] ?? []);
+
+        echo json_encode([
+            'success' => true,
+            'sites'   => $safe_sites,
+            'logs'    => $logs
+        ]);
+        exit;
+    }
+
+    // 14. レポート集計データ取得
+    if ($action === 'report_stats') {
+        $site_id    = trim($_GET['site_id'] ?? '');
+        $start_date = trim($_GET['start_date'] ?? date('Y-m-d', strtotime('-13 days')));
+        $end_date   = trim($_GET['end_date'] ?? date('Y-m-d'));
+
+        $where = ["DATE(created_at) >= ?", "DATE(created_at) <= ?"];
+        $params = [$start_date, $end_date];
+        if ($site_id !== '') {
+            $where[] = "site_id = ?";
+            $params[] = $site_id;
+        }
+
+        $sql = "SELECT * FROM bot_logs WHERE " . implode(" AND ", $where) . " ORDER BY created_at ASC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $logs = $stmt->fetchAll();
+
+        $total_sessions = count($logs);
+        $ticket_sessions = 0;
+        $user_interactions = 0;
+        $daily_map = [];
+        $choice_counts = [];
+
+        // 期間内の全日付キーを初期化
+        $cur_ts = strtotime($start_date);
+        $end_ts = strtotime($end_date);
+        while ($cur_ts <= $end_ts && count($daily_map) < 90) {
+            $d_str = date('Y-m-d', $cur_ts);
+            $daily_map[$d_str] = ['date' => $d_str, 'total' => 0, 'solved' => 0, 'ticket' => 0];
+            $cur_ts = strtotime('+1 day', $cur_ts);
+        }
+
+        foreach ($logs as $r) {
+            $d_key = substr($r['created_at'], 0, 10);
+            $is_ticket = !empty($r['ticket_id']);
+            if ($is_ticket) $ticket_sessions++;
+
+            if (isset($daily_map[$d_key])) {
+                $daily_map[$d_key]['total']++;
+                if ($is_ticket) {
+                    $daily_map[$d_key]['ticket']++;
+                } else {
+                    $daily_map[$d_key]['solved']++;
+                }
+            }
+
+            $msgs = json_decode($r['messages_json'] ?: '[]', true);
+            if (is_array($msgs)) {
+                foreach ($msgs as $m) {
+                    if (($m['sender'] ?? '') === 'user') {
+                        $user_interactions++;
+                        $txt = trim($m['text'] ?? '');
+                        if ($txt !== '' && mb_strpos($txt, '【フォーム送信】') !== 0) {
+                            $short_txt = mb_strimwidth($txt, 0, 45, '...');
+                            $choice_counts[$short_txt] = ($choice_counts[$short_txt] ?? 0) + 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        $solved_sessions = max(0, $total_sessions - $ticket_sessions);
+        $resolution_rate = $total_sessions > 0 ? round(($solved_sessions / $total_sessions) * 100, 1) : 0;
+
+        arsort($choice_counts);
+        $top_choices = [];
+        foreach (array_slice($choice_counts, 0, 8, true) as $label => $cnt) {
+            $top_choices[] = ['label' => $label, 'count' => $cnt];
+        }
+
+        // ナレッジベース人気ランキング
+        if ($site_id !== '') {
+            $stmt_kb = $pdo->prepare("SELECT id, category, question, hit_count FROM bot_knowledge WHERE site_id = ? AND hit_count > 0 ORDER BY hit_count DESC LIMIT 8");
+            $stmt_kb->execute([$site_id]);
+        } else {
+            $stmt_kb = $pdo->query("SELECT id, category, question, hit_count FROM bot_knowledge WHERE hit_count > 0 ORDER BY hit_count DESC LIMIT 8");
+        }
+        $top_kb = $stmt_kb->fetchAll();
+
+        $safe_sites = array_map(function($s) {
+            return ['id' => $s['id'], 'name' => $s['name']];
+        }, $config['sites'] ?? []);
+
+        echo json_encode([
+            'success' => true,
+            'sites'   => $safe_sites,
+            'kpi'     => [
+                'total_sessions'    => $total_sessions,
+                'solved_sessions'   => $solved_sessions,
+                'ticket_sessions'   => $ticket_sessions,
+                'resolution_rate'   => $resolution_rate,
+                'user_interactions' => $user_interactions
+            ],
+            'daily'       => array_values($daily_map),
+            'top_choices' => $top_choices,
+            'top_kb'      => $top_kb
         ]);
         exit;
     }

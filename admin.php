@@ -356,10 +356,10 @@ if (file_exists($config_file)) {
         </a>
         <ul class="top-nav">
             <li><a href="admin_bot.php">チャット</a></li>
-            <li class="disabled"><a href="#" onclick="return false;">訪問者</a></li>
-            <li class="disabled"><a href="#" onclick="return false;">履歴</a></li>
+            <li><a href="admin_visitors.php">訪問者</a></li>
+            <li><a href="admin_logs.php">履歴</a></li>
             <li class="active"><a href="admin.php">チケット<span id="header-badge" class="ticket-badge" style="display:none;">0</span></a></li>
-            <li class="disabled"><a href="#" onclick="return false;">レポート</a></li>
+            <li><a href="admin_reports.php">レポート</a></li>
         </ul>
     </div>
     <div class="header-right">

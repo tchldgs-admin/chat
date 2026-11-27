@@ -80,7 +80,6 @@ if ($admin_role !== 'admin') {
         .top-nav { display: flex; height: 100%; list-style: none; gap: 6px; }
         .top-nav li a { display: flex; align-items: center; height: 100%; padding: 0 14px; text-decoration: none; color: #555; font-weight: bold; font-size: 14px; }
         .top-nav li a:hover { color: var(--primary-blue); }
-        .top-nav li.disabled a { color: #a0aec0; cursor: default; }
         .header-right { display: flex; align-items: center; gap: 16px; color: #666; }
         .logout-link { color: #666; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; border: 1px solid #cbd5e0; }
         .logout-link:hover { background: #f7fafc; color: #e53e3e; border-color: #feb2b2; }
@@ -153,10 +152,10 @@ if ($admin_role !== 'admin') {
         </a>
         <ul class="top-nav">
             <li><a href="admin_bot.php">チャット</a></li>
-            <li class="disabled"><a href="#" onclick="return false;">訪問者</a></li>
-            <li class="disabled"><a href="#" onclick="return false;">履歴</a></li>
+            <li><a href="admin_visitors.php">訪問者</a></li>
+            <li><a href="admin_logs.php">履歴</a></li>
             <li><a href="admin.php">チケット</a></li>
-            <li class="disabled"><a href="#" onclick="return false;">レポート</a></li>
+            <li><a href="admin_reports.php">レポート</a></li>
         </ul>
     </div>
     <div class="header-right">
