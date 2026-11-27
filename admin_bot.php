@@ -181,8 +181,14 @@ $base_url = $protocol . $domain . $dir;
         .embed-code-box {
             width: 100%; font-family: monospace; font-size: 12px;
             background: #f8fafc; border: 1px solid #cbd5e0; border-radius: 4px;
-            padding: 10px; height: 68px; resize: none;
+            padding: 10px; height: 78px; resize: none;
         }
+        .btn-copy-code {
+            background: var(--navy-btn); color: #fff; border: none; padding: 5px 12px;
+            border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer;
+        }
+        .btn-copy-code:hover { background: var(--navy-btn-hover); }
+        .btn-copy-code.copied { background: #38a169 !important; }
     </style>
 </head>
 <body>
@@ -364,14 +370,28 @@ $base_url = $protocol . $domain . $dir;
             </div>
         </div>
 
-        <!-- タブ4：機能・営業時間・iframe埋め込みコード -->
+        <!-- タブ4：機能・営業時間・iframe＆GTM埋め込みコード -->
         <div class="tab-panel" id="tab-func">
             <div class="card-box">
-                <div class="card-title">HTML埋め込み用 iframe コード（右下フローティング表示）</div>
-                <div class="form-group">
-                    <label>① 標準 iframe 埋め込みコード（スクリプト不可のサイトにも対応）</label>
-                    <textarea id="bot-iframe-code" class="embed-code-box" readonly onclick="this.select();"></textarea>
-                    <div class="form-note">※ホームページの &lt;/body&gt; 直前などに貼り付けるだけで、画面右下にチャットボットが固定表示されます。</div>
+                <div class="card-title">HTML埋め込み用コード（右下フローティング表示）</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label style="margin-bottom:0;">① 直接埋め込み用 iframe コード（Bitfan等のHTML欄向け）</label>
+                            <button type="button" class="btn-copy-code" data-target="bot-iframe-code" style="background:#28a745;">コピー</button>
+                        </div>
+                        <textarea id="bot-iframe-code" class="embed-code-box" readonly onclick="this.select();"></textarea>
+                        <div class="form-note">※scriptタグが使えないサイトのHTML編集欄へそのまま貼り付けられます。</div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label style="margin-bottom:0;">② GTM用 カスタムHTMLコード（Googleタグマネージャー向け）</label>
+                            <button type="button" class="btn-copy-code" data-target="bot-gtm-code" style="background:#29a3e5;">コピー</button>
+                        </div>
+                        <textarea id="bot-gtm-code" class="embed-code-box" readonly onclick="this.select();"></textarea>
+                        <div class="form-note">※GTMの「カスタムHTML」タグへそのまま貼り付けて配信できます。</div>
+                    </div>
                 </div>
             </div>
 
@@ -474,8 +494,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateEmbedCode() {
-        const code = `<iframe src="${baseUrl}/bot.php?site=${encodeURIComponent(currentSiteId)}" style="position:fixed; bottom:0; right:16px; width:390px; height:580px; max-width:95vw; max-height:88vh; border:none; z-index:99999; background:transparent;" allowtransparency="true"></iframe>`;
-        document.getElementById('bot-iframe-code').value = code;
+        const iframeCode = `<iframe src="${baseUrl}/bot.php?site=${encodeURIComponent(currentSiteId)}" style="position:fixed; bottom:0; right:16px; width:390px; height:580px; max-width:95vw; max-height:88vh; border:none; z-index:99999; background:transparent;" allowtransparency="true"></iframe>`;
+        const safeId = String(currentSiteId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const gtmCode = `<script>\n(function() {\n  var siteId = '${safeId}';\n  if (document.getElementById('tc-plus-bot-iframe')) return;\n  var iframe = document.createElement('iframe');\n  iframe.id = 'tc-plus-bot-iframe';\n  iframe.src = '${baseUrl}/bot.php?site=' + encodeURIComponent(siteId);\n  iframe.style.position = 'fixed';\n  iframe.style.bottom = '0px';\n  iframe.style.right = '16px';\n  iframe.style.width = '390px';\n  iframe.style.height = '580px';\n  iframe.style.maxWidth = '95vw';\n  iframe.style.maxHeight = '88vh';\n  iframe.style.border = 'none';\n  iframe.style.zIndex = '99999';\n  iframe.style.background = 'transparent';\n  iframe.setAttribute('allowtransparency', 'true');\n  document.body.appendChild(iframe);\n})();\n<\/script>`;
+
+        document.getElementById('bot-iframe-code').value = iframeCode;
+        document.getElementById('bot-gtm-code').value = gtmCode;
         document.getElementById('btn-kb-export').href = `bot_api.php?action=kb_export_csv&site_id=${encodeURIComponent(currentSiteId)}`;
     }
 
@@ -765,6 +789,29 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.addEventListener('click', async function(e) {
+        const copyCodeBtn = e.target.closest('.btn-copy-code');
+        if (copyCodeBtn) {
+            const ta = document.getElementById(copyCodeBtn.dataset.target);
+            const origText = copyCodeBtn.textContent;
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(ta.value);
+                } else {
+                    ta.select();
+                    document.execCommand('copy');
+                }
+                copyCodeBtn.classList.add('copied');
+                copyCodeBtn.textContent = 'コピー完了！';
+                setTimeout(() => {
+                    copyCodeBtn.classList.remove('copied');
+                    copyCodeBtn.textContent = origText;
+                }, 2000);
+            } catch (err) {
+                alert('コピーに失敗しました。');
+            }
+            return;
+        }
+
         if (e.target.classList.contains('btn-add-opt')) {
             const idx = Number(e.target.dataset.nidx);
             treeNodes[idx].options = treeNodes[idx].options || [];

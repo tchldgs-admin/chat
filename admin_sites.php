@@ -126,17 +126,20 @@ $base_url = $protocol . $domain . $dir;
         .btn-edit:hover { color: var(--primary-blue); border-color: #bee3f8; background: #ebf8ff; }
         .btn-delete:hover { color: #e53e3e; border-color: #fed7d7; background: #fff5f5; }
 
-        .embed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .embed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        @media (max-width: 1180px) {
+            .embed-grid { grid-template-columns: 1fr; }
+        }
         .embed-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 12px 14px; }
-        .embed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .embed-label { font-size: 12px; font-weight: bold; color: #4a5568; display: flex; align-items: center; gap: 6px; }
-        .btn-copy { background: var(--navy-btn); color: #fff; border: none; padding: 5px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: background 0.2s; }
+        .embed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 6px; }
+        .embed-label { font-size: 12px; font-weight: bold; color: #4a5568; display: flex; align-items: center; gap: 5px; }
+        .btn-copy { background: var(--navy-btn); color: #fff; border: none; padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: background 0.2s; white-space: nowrap; }
         .btn-copy:hover { background: var(--navy-btn-hover); }
-        .btn-copy.copied { background: #38a169; }
+        .btn-copy.copied { background: #38a169 !important; }
         .embed-code-input {
-            width: 100%; font-family: Consolas, Monaco, "Courier New", monospace; font-size: 11.5px;
+            width: 100%; font-family: Consolas, Monaco, "Courier New", monospace; font-size: 11px;
             background: #fff; border: 1px solid #cbd5e0; border-radius: 4px; padding: 8px 10px;
-            color: #2d3748; resize: none; height: 64px; line-height: 1.4;
+            color: #2d3748; resize: none; height: 74px; line-height: 1.4;
         }
         .embed-code-input:focus { outline: none; border-color: var(--primary-blue); }
 
@@ -341,6 +344,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function buildGtmBotCode(siteId) {
+        const safeId = String(siteId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `<script>\n(function() {\n  var siteId = '${safeId}';\n  if (document.getElementById('tc-plus-bot-iframe')) return;\n  var iframe = document.createElement('iframe');\n  iframe.id = 'tc-plus-bot-iframe';\n  iframe.src = '${baseUrl}/bot.php?site=' + encodeURIComponent(siteId);\n  iframe.style.position = 'fixed';\n  iframe.style.bottom = '0px';\n  iframe.style.right = '16px';\n  iframe.style.width = '390px';\n  iframe.style.height = '580px';\n  iframe.style.maxWidth = '95vw';\n  iframe.style.maxHeight = '88vh';\n  iframe.style.border = 'none';\n  iframe.style.zIndex = '99999';\n  iframe.style.background = 'transparent';\n  iframe.setAttribute('allowtransparency', 'true');\n  document.body.appendChild(iframe);\n})();\n<\/script>`;
+    }
+
     async function loadSites() {
         try {
             const res = await fetch('admin_sites_api.php?action=list', { cache: 'no-store' });
@@ -365,6 +373,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const botUrl  = `${baseUrl}/bot.php?site=${encodeURIComponent(s.id)}`;
                 const iframeFormCode = `<iframe src="${formUrl}" width="100%" height="620" style="border:none;"></iframe>`;
                 const iframeBotCode  = `<iframe src="${botUrl}" style="position:fixed; bottom:0; right:16px; width:390px; height:580px; max-width:95vw; max-height:88vh; border:none; z-index:99999; background:transparent;" allowtransparency="true"></iframe>`;
+                const gtmBotCode     = buildGtmBotCode(s.id);
+
                 const urlLink = s.url
                     ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)} ↗</a>`
                     : `<span style="color:#a0aec0;">設置URL未設定</span>`;
@@ -416,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
                                     <span>お問い合わせフォーム埋め込み用 iframe</span>
                                 </span>
-                                <button type="button" class="btn-copy" data-code="${esc(iframeFormCode)}">
+                                <button type="button" class="btn-copy">
                                     <span>コピー</span>
                                 </button>
                             </div>
@@ -429,11 +439,24 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
                                     <span>右下チャットボット埋め込み用 iframe</span>
                                 </span>
-                                <button type="button" class="btn-copy" style="background:#28a745;" data-code="${esc(iframeBotCode)}">
+                                <button type="button" class="btn-copy" style="background:#28a745;">
                                     <span>コピー</span>
                                 </button>
                             </div>
                             <textarea class="embed-code-input" readonly onclick="this.select();">${esc(iframeBotCode)}</textarea>
+                        </div>
+
+                        <div class="embed-box" style="background:#ebf8ff; border-color:#bee3f8;">
+                            <div class="embed-header">
+                                <span class="embed-label" style="color:#2b6cb0;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+                                    <span>GTM用 チャットボット（カスタムHTML）</span>
+                                </span>
+                                <button type="button" class="btn-copy" style="background:#29a3e5;">
+                                    <span>コピー</span>
+                                </button>
+                            </div>
+                            <textarea class="embed-code-input" readonly onclick="this.select();">${esc(gtmBotCode)}</textarea>
                         </div>
                     </div>
                 </div>`;
@@ -500,7 +523,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const copyBtn = e.target.closest('.btn-copy');
         if (copyBtn) {
-            const code = copyBtn.dataset.code;
+            const ta = copyBtn.closest('.embed-box').querySelector('textarea');
+            const code = ta.value;
             const span = copyBtn.querySelector('span');
             const origText = span.textContent;
 
@@ -508,7 +532,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (navigator.clipboard && window.isSecureContext) {
                     await navigator.clipboard.writeText(code);
                 } else {
-                    const ta = copyBtn.closest('.embed-box').querySelector('textarea');
                     ta.select();
                     document.execCommand('copy');
                 }
