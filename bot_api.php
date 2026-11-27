@@ -55,6 +55,8 @@ try {
         user_agent VARCHAR(255) NOT NULL DEFAULT '',
         messages_json LONGTEXT,
         ticket_id INT NULL DEFAULT NULL,
+        satisfaction VARCHAR(20) NOT NULL DEFAULT '',
+        satisfaction_comment TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_session_key (session_key),
@@ -67,6 +69,12 @@ try {
     }
     if (!in_array('user_agent', $log_cols)) {
         $pdo->exec("ALTER TABLE bot_logs ADD COLUMN user_agent VARCHAR(255) NOT NULL DEFAULT '' AFTER page_url");
+    }
+    if (!in_array('satisfaction', $log_cols)) {
+        $pdo->exec("ALTER TABLE bot_logs ADD COLUMN satisfaction VARCHAR(20) NOT NULL DEFAULT '' AFTER ticket_id");
+    }
+    if (!in_array('satisfaction_comment', $log_cols)) {
+        $pdo->exec("ALTER TABLE bot_logs ADD COLUMN satisfaction_comment TEXT AFTER satisfaction");
     }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS bot_knowledge (
@@ -126,7 +134,8 @@ function get_default_tree($site_name = 'サポート') {
             'options' => [
                 ['label' => 'よくあるご質問・ご案内', 'next_node_id' => 'node_faq'],
                 ['label' => '営業時間・アクセスについて', 'next_node_id' => 'node_info'],
-                ['label' => 'オペレーターへお問い合わせ（メール受付）', 'next_node_id' => 'node_form']
+                ['label' => 'オペレーターへお問い合わせ（メール受付）', 'next_node_id' => 'node_form'],
+                ['label' => 'チャット終了', 'next_node_id' => '__end_chat__']
             ],
             'link_label' => '',
             'link_url' => ''
@@ -138,7 +147,8 @@ function get_default_tree($site_name = 'サポート') {
             'action_type' => 'options',
             'options' => [
                 ['label' => 'お問い合わせフォームへ進む', 'next_node_id' => 'node_form'],
-                ['label' => '最初のメニューに戻る', 'next_node_id' => 'node_start']
+                ['label' => '最初のメニューに戻る', 'next_node_id' => 'node_start'],
+                ['label' => 'チャット終了', 'next_node_id' => '__end_chat__']
             ],
             'link_label' => '',
             'link_url' => ''
@@ -150,7 +160,8 @@ function get_default_tree($site_name = 'サポート') {
             'action_type' => 'options',
             'options' => [
                 ['label' => '個別にお問い合わせする', 'next_node_id' => 'node_form'],
-                ['label' => '最初のメニューに戻る', 'next_node_id' => 'node_start']
+                ['label' => '最初のメニューに戻る', 'next_node_id' => 'node_start'],
+                ['label' => 'チャット終了', 'next_node_id' => '__end_chat__']
             ],
             'link_label' => '',
             'link_url' => ''
@@ -415,7 +426,7 @@ if ($action === 'kb_export_csv') {
 }
 
 // --------------------------------------------------
-// CSVエクスポート（チャット履歴ログ）
+// CSVエクスポート（チャット履歴ログ・満足度含む）
 // --------------------------------------------------
 if ($action === 'logs_export_csv') {
     if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -429,7 +440,8 @@ if ($action === 'logs_export_csv') {
     header('Content-Disposition: attachment; filename="chat_logs_' . date('Ymd_His') . '.csv"');
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['ログID', 'サイト名', '訪問者名', 'メールアドレス', '連携チケットID', '開始日時', '最終更新日時', '会話内容']);
+    fputcsv($out, ['ログID', 'サイト名', '訪問者名', 'メールアドレス', '連携チケットID', '満足度評価', 'アンケートご意見', '開始日時', '最終更新日時', '会話内容']);
+    $sat_map = ['satisfied' => '満足', 'dissatisfied' => '不満'];
     foreach ($rows as $r) {
         $msgs = json_decode($r['messages_json'] ?: '[]', true);
         $conv = '';
@@ -445,6 +457,8 @@ if ($action === 'logs_export_csv') {
             $r['visitor_name'] ?: '(匿名訪問者)',
             $r['visitor_email'],
             $r['ticket_id'] ? '#' . $r['ticket_id'] : 'ボット完結',
+            $sat_map[$r['satisfaction'] ?? ''] ?? '未回答',
+            $r['satisfaction_comment'] ?? '',
             $r['created_at'],
             $r['updated_at'],
             rtrim($conv, ' / ')
@@ -616,7 +630,44 @@ try {
         exit;
     }
 
-    // 4. チャット内ヒアリングフォーム送信 → 既存チケットシステムへ自動起票（プレビュー時は起票しない）
+    // 3.5. チャット終了時の満足度アンケート保存（プレビュー時は記録しない）
+    if ($action === 'submit_survey') {
+        if (!empty($_POST['preview'])) {
+            echo json_encode(['success' => true, 'preview' => true]);
+            exit;
+        }
+
+        $site_id      = trim($_POST['site_id'] ?? '');
+        $session_key  = trim($_POST['session_key'] ?? '');
+        $satisfaction = trim($_POST['satisfaction'] ?? '');
+        $comment      = trim($_POST['comment'] ?? '');
+
+        if (!in_array($satisfaction, ['satisfied', 'dissatisfied'], true)) {
+            throw new Exception('評価を選択してください。');
+        }
+
+        $site = get_site_by_id($config, $site_id);
+        if (!$site || $session_key === '') {
+            throw new Exception('セッション情報が見つかりません。');
+        }
+
+        $stmt = $pdo->prepare("SELECT id FROM bot_logs WHERE session_key = ? AND site_id = ?");
+        $stmt->execute([$session_key, $site_id]);
+        $existing = $stmt->fetch();
+
+        if ($existing) {
+            $upd = $pdo->prepare("UPDATE bot_logs SET satisfaction = ?, satisfaction_comment = ?, updated_at = NOW() WHERE id = ?");
+            $upd->execute([$satisfaction, $comment, $existing['id']]);
+        } else {
+            $ins = $pdo->prepare("INSERT INTO bot_logs (session_key, site_id, site_name, messages_json, satisfaction, satisfaction_comment) VALUES (?, ?, ?, '[]', ?, ?)");
+            $ins->execute([$session_key, $site_id, $site['name'] ?? '', $satisfaction, $comment]);
+        }
+
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    // 4. チャット内ヒアリングフォーム送信 → 既存チケットシステムへ自動起票
     if ($action === 'submit_ticket') {
         if (!empty($_POST['preview'])) {
             echo json_encode([
@@ -1050,6 +1101,7 @@ try {
                 'msg_count'     => $msg_count,
                 'last_msg'      => $last_msg,
                 'ticket_id'     => $r['ticket_id'],
+                'satisfaction'  => $r['satisfaction'] ?? '',
                 'created_at'    => $r['created_at'],
                 'updated_at'    => $r['updated_at']
             ];
@@ -1068,7 +1120,7 @@ try {
         exit;
     }
 
-    // 13. 会話履歴一覧取得
+    // 13. 会話履歴一覧取得（満足度評価・コメント含む）
     if ($action === 'logs_list') {
         $where = [];
         $params = [];
@@ -1090,10 +1142,15 @@ try {
             $where[] = "ticket_id IS NOT NULL";
         } elseif ($result_type === 'bot_only') {
             $where[] = "ticket_id IS NULL";
+        } elseif ($result_type === 'satisfied') {
+            $where[] = "satisfaction = 'satisfied'";
+        } elseif ($result_type === 'dissatisfied') {
+            $where[] = "satisfaction = 'dissatisfied'";
         }
         if (!empty($_GET['word'])) {
             $w = '%' . trim($_GET['word']) . '%';
-            $where[] = "(visitor_name LIKE ? OR visitor_email LIKE ? OR messages_json LIKE ?)";
+            $where[] = "(visitor_name LIKE ? OR visitor_email LIKE ? OR messages_json LIKE ? OR satisfaction_comment LIKE ?)";
+            $params[] = $w;
             $params[] = $w;
             $params[] = $w;
             $params[] = $w;
@@ -1125,17 +1182,19 @@ try {
             }
 
             $logs[] = [
-                'id'             => $r['id'],
-                'site_id'        => $r['site_id'],
-                'site_name'      => $r['site_name'],
-                'visitor_name'   => $r['visitor_name'] ?: 'ゲスト訪問者 #' . $r['id'],
-                'visitor_email'  => $r['visitor_email'],
-                'ticket_id'      => $r['ticket_id'],
-                'msg_count'      => count($msgs),
-                'summary'        => $first_user_msg ?: '(会話記録なし)',
-                'messages'       => $msgs,
-                'created_at'     => $r['created_at'],
-                'updated_at'     => $r['updated_at']
+                'id'                   => $r['id'],
+                'site_id'              => $r['site_id'],
+                'site_name'            => $r['site_name'],
+                'visitor_name'         => $r['visitor_name'] ?: 'ゲスト訪問者 #' . $r['id'],
+                'visitor_email'        => $r['visitor_email'],
+                'ticket_id'            => $r['ticket_id'],
+                'satisfaction'         => $r['satisfaction'] ?? '',
+                'satisfaction_comment' => $r['satisfaction_comment'] ?? '',
+                'msg_count'            => count($msgs),
+                'summary'              => $first_user_msg ?: '(会話記録なし)',
+                'messages'             => $msgs,
+                'created_at'           => $r['created_at'],
+                'updated_at'           => $r['updated_at']
             ];
         }
 
@@ -1151,7 +1210,7 @@ try {
         exit;
     }
 
-    // 14. レポート集計データ取得
+    // 14. レポート集計データ取得（満足度集計含む）
     if ($action === 'report_stats') {
         $site_id    = trim($_GET['site_id'] ?? '');
         $start_date = trim($_GET['start_date'] ?? date('Y-m-d', strtotime('-13 days')));
@@ -1172,6 +1231,9 @@ try {
         $total_sessions = count($logs);
         $ticket_sessions = 0;
         $user_interactions = 0;
+        $sat_good = 0;
+        $sat_bad  = 0;
+        $sat_comments = [];
         $daily_map = [];
         $choice_counts = [];
 
@@ -1187,6 +1249,19 @@ try {
             $d_key = substr($r['created_at'], 0, 10);
             $is_ticket = !empty($r['ticket_id']);
             if ($is_ticket) $ticket_sessions++;
+
+            $sat = $r['satisfaction'] ?? '';
+            if ($sat === 'satisfied') $sat_good++;
+            if ($sat === 'dissatisfied') $sat_bad++;
+
+            if ($sat !== '' && trim((string)($r['satisfaction_comment'] ?? '')) !== '') {
+                $sat_comments[] = [
+                    'site_name'    => $r['site_name'],
+                    'satisfaction' => $sat,
+                    'comment'      => trim((string)$r['satisfaction_comment']),
+                    'updated_at'   => $r['updated_at']
+                ];
+            }
 
             if (isset($daily_map[$d_key])) {
                 $daily_map[$d_key]['total']++;
@@ -1214,6 +1289,8 @@ try {
 
         $solved_sessions = max(0, $total_sessions - $ticket_sessions);
         $resolution_rate = $total_sessions > 0 ? round(($solved_sessions / $total_sessions) * 100, 1) : 0;
+        $sat_total = $sat_good + $sat_bad;
+        $sat_rate  = $sat_total > 0 ? round(($sat_good / $sat_total) * 100, 1) : null;
 
         arsort($choice_counts);
         $top_choices = [];
@@ -1241,11 +1318,16 @@ try {
                 'solved_sessions'   => $solved_sessions,
                 'ticket_sessions'   => $ticket_sessions,
                 'resolution_rate'   => $resolution_rate,
-                'user_interactions' => $user_interactions
+                'user_interactions' => $user_interactions,
+                'sat_good'          => $sat_good,
+                'sat_bad'           => $sat_bad,
+                'sat_total'         => $sat_total,
+                'sat_rate'          => $sat_rate
             ],
-            'daily'       => array_values($daily_map),
-            'top_choices' => $top_choices,
-            'top_kb'      => $top_kb
+            'daily'        => array_values($daily_map),
+            'top_choices'  => $top_choices,
+            'top_kb'       => $top_kb,
+            'sat_comments' => array_slice(array_reverse($sat_comments), 0, 10)
         ]);
         exit;
     }

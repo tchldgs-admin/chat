@@ -89,17 +89,19 @@ $default_end   = date('Y-m-d');
         .form-control { height: 32px; padding: 4px 10px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 12.5px; background: #fff; }
         .btn-navy { background: var(--navy-btn); color: #fff; border: none; height: 32px; padding: 0 14px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px; }
 
-        /* KPIサマリーカード */
-        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
-        .kpi-card { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px 18px; }
+        /* KPIサマリーカード（5列） */
+        .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 20px; }
+        @media (max-width: 1180px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        .kpi-card { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; }
         .kpi-label { font-size: 12px; color: #718096; font-weight: bold; margin-bottom: 6px; }
-        .kpi-val { font-size: 26px; font-weight: bold; color: #2d3748; }
+        .kpi-val { font-size: 24px; font-weight: bold; color: #2d3748; }
         .kpi-sub { font-size: 11px; color: #718096; margin-top: 4px; }
 
         .card-box { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 18px 20px; margin-bottom: 18px; }
         .card-title { font-size: 15px; font-weight: bold; color: #2d3748; margin-bottom: 14px; border-bottom: 1px solid #edf2f7; padding-bottom: 8px; }
 
-        /* 日別バーグラフ（CSSベースで軽量・高速描画） */
         .chart-wrap { display: flex; align-items: flex-end; gap: 8px; height: 190px; padding: 16px 8px 6px; border-bottom: 1px solid #cbd5e0; overflow-x: auto; }
         .chart-col { flex: 1; min-width: 36px; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
         .bar-stack { width: 24px; display: flex; flex-direction: column-reverse; border-radius: 3px 3px 0 0; overflow: hidden; }
@@ -109,11 +111,15 @@ $default_end   = date('Y-m-d');
         .chart-labels { display: flex; gap: 8px; padding: 6px 8px 0; overflow-x: auto; }
         .chart-lbl { flex: 1; min-width: 36px; text-align: center; font-size: 10px; color: #718096; }
 
-        .rank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        .rank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
         .rank-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #edf2f7; font-size: 12.5px; }
         .rank-num { width: 22px; height: 22px; border-radius: 50%; background: #edf2f7; color: #4a5568; font-weight: bold; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; flex-shrink: 0; }
         .rank-row:nth-child(1) .rank-num { background: #ecc94b; color: #744210; }
         .rank-count { font-weight: bold; color: #2b6cb0; background: #ebf8ff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+
+        .comment-row { padding: 10px 0; border-bottom: 1px solid #edf2f7; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .pill-good { background: #ebf8ff; color: #2b6cb0; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .pill-bad { background: #fff5f5; color: #c53030; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -170,23 +176,28 @@ $default_end   = date('Y-m-d');
         <div class="kpi-grid">
             <div class="kpi-card">
                 <div class="kpi-label">チャットボット起動数</div>
-                <div class="kpi-val" id="kpi-total">0</div>
+                <div class="kpi-val" id="kpi-total">0 件</div>
                 <div class="kpi-sub">期間内の総セッション数</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">ボット完結数（自己解決）</div>
-                <div class="kpi-val" id="kpi-solved" style="color:#38a169;">0</div>
+                <div class="kpi-val" id="kpi-solved" style="color:#38a169;">0 件</div>
                 <div class="kpi-sub">問い合わせ化せず案内完了</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">チケット自動起票数</div>
-                <div class="kpi-val" id="kpi-ticket" style="color:#29a3e5;">0</div>
+                <div class="kpi-val" id="kpi-ticket" style="color:#29a3e5;">0 件</div>
                 <div class="kpi-sub">フォーム送信・メール受付数</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">ボット完結率</div>
                 <div class="kpi-val" id="kpi-rate">0%</div>
                 <div class="kpi-sub">自動案内のみで解決した割合</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">満足度（アンケート結果）</div>
+                <div class="kpi-val" id="kpi-sat-rate" style="color:#2b7bb9;">-</div>
+                <div class="kpi-sub" id="kpi-sat-detail">満足 0件 / 不満 0件</div>
             </div>
         </div>
 
@@ -211,6 +222,11 @@ $default_end   = date('Y-m-d');
                 <div class="card-title">ナレッジベース（Q&A）ヒット数ランキング</div>
                 <div id="top-kb-list"></div>
             </div>
+        </div>
+
+        <div class="card-box">
+            <div class="card-title">チャット終了時アンケート ご意見一覧（最新10件）</div>
+            <div id="sat-comments-list"></div>
         </div>
     </main>
 </div>
@@ -249,6 +265,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('kpi-solved').textContent = `${kpi.solved_sessions || 0} 件`;
         document.getElementById('kpi-ticket').textContent = `${kpi.ticket_sessions || 0} 件`;
         document.getElementById('kpi-rate').textContent   = `${kpi.resolution_rate || 0}%`;
+
+        document.getElementById('kpi-sat-rate').textContent   = (kpi.sat_rate !== null && kpi.sat_rate !== undefined) ? `${kpi.sat_rate}%` : '回答なし';
+        document.getElementById('kpi-sat-detail').textContent = `👍 満足 ${kpi.sat_good || 0}件 / 👎 不満 ${kpi.sat_bad || 0}件`;
 
         // 日別棒グラフ描画
         const daily = data.daily || [];
@@ -296,6 +315,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span class="rank-count">${k.hit_count} ヒット</span>
                 </div>`).join('')
             : '<div style="padding:20px; text-align:center; color:#a0aec0;">まだヒット履歴がありません</div>';
+
+        // アンケートご意見一覧
+        const comments = data.sat_comments || [];
+        document.getElementById('sat-comments-list').innerHTML = comments.length
+            ? comments.map(c => {
+                const badge = c.satisfaction === 'satisfied'
+                    ? '<span class="pill-good">👍 満足</span>'
+                    : '<span class="pill-bad">👎 不満</span>';
+                return `
+                <div class="comment-row">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        ${badge}
+                        <span style="font-size:11.5px; color:#718096;">[${esc(c.site_name)}]</span>
+                        <span style="color:#2d3748;">${esc(c.comment)}</span>
+                    </div>
+                    <span style="font-size:11px; color:#a0aec0; flex-shrink:0;">${esc(c.updated_at)}</span>
+                </div>`;
+            }).join('')
+            : '<div style="padding:20px; text-align:center; color:#a0aec0;">コメント付きのアンケート回答はまだありません</div>';
     }
 
     document.getElementById('report-filter-form').addEventListener('submit', function(e) {

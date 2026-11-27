@@ -1,11 +1,10 @@
 <?php
-// 外部サイトへのiframe埋め込みを許可
 header("X-Content-Type-Options: nosniff");
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 
 $site_id = trim($_GET['site'] ?? '');
 $initial_open = !empty($_GET['open']);
-$is_preview = !empty($_GET['preview']); // 管理画面プレビュー用フラグ
+$is_preview = !empty($_GET['preview']);
 if ($site_id === '') {
     http_response_code(404);
     exit;
@@ -126,6 +125,7 @@ if ($site_id === '') {
        展開時チャットウィンドウ
        -------------------------------------------------- */
     .chat-window {
+        position: relative;
         width: 100%; height: 100%;
         max-width: 370px; max-height: 560px;
         background: #ffffff;
@@ -144,6 +144,7 @@ if ($site_id === '') {
         padding: 12px 14px;
         display: flex; align-items: center; justify-content: space-between;
         flex-shrink: 0;
+        z-index: 20;
     }
     .header-profile { display: flex; align-items: center; gap: 10px; overflow: hidden; }
     .header-avatar {
@@ -166,6 +167,7 @@ if ($site_id === '') {
         background: #fefcbf; color: #744210; font-size: 11px; font-weight: bold;
         padding: 4px 10px; text-align: center; border-bottom: 1px solid #f6e05e;
         flex-shrink: 0;
+        z-index: 20;
     }
 
     .chat-messages {
@@ -260,6 +262,136 @@ if ($site_id === '') {
     }
     .maint-box strong { display: block; font-size: 14px; margin-bottom: 6px; color: #7b341e; }
 
+    /* --------------------------------------------------
+       チャット終了・満足度アンケートオーバーレイ（本家再現UI）
+       -------------------------------------------------- */
+    .survey-overlay {
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        top: 60px;
+        background: rgba(235, 238, 242, 0.96);
+        backdrop-filter: blur(2px);
+        z-index: 15;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 22px 20px 16px;
+        animation: fadeInUp 0.22s ease;
+    }
+    .survey-overlay.hidden { display: none; }
+    .survey-title {
+        font-size: 17px;
+        font-weight: bold;
+        color: #1a202c;
+        margin-bottom: 14px;
+    }
+    .survey-required-bar {
+        background: #ffffff;
+        text-align: center;
+        padding: 6px 10px;
+        font-size: 15px;
+        font-weight: bold;
+        color: #1a202c;
+        border-radius: 2px;
+        margin-bottom: 22px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .survey-required-bar span {
+        color: #e53e3e;
+        margin-left: 2px;
+    }
+    .survey-thumbs-row {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        margin-bottom: 24px;
+        padding: 0 16px;
+    }
+    .thumb-choice {
+        background: transparent;
+        border: 2px solid transparent;
+        border-radius: 12px;
+        padding: 10px 18px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        color: #2b7bb9;
+        transition: all 0.15s;
+    }
+    .thumb-choice:hover {
+        background: rgba(255, 255, 255, 0.7);
+        transform: translateY(-2px);
+    }
+    .thumb-choice.selected {
+        background: #ffffff;
+        border-color: #2b7bb9;
+        box-shadow: 0 4px 12px rgba(43, 123, 185, 0.22);
+    }
+    .thumb-choice span {
+        font-size: 15px;
+        font-weight: bold;
+        color: #2b7bb9;
+    }
+    .survey-comment-label {
+        font-size: 13px;
+        font-weight: bold;
+        color: #2d3748;
+        margin-bottom: 8px;
+        line-height: 1.4;
+    }
+    .survey-comment-input {
+        width: 100%;
+        height: 44px;
+        background: #ffffff;
+        border: 1px solid #cbd5e0;
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-family: inherit;
+        outline: none;
+    }
+    .survey-comment-input:focus {
+        border-color: #2b7bb9;
+    }
+    .survey-bottom-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-top: 12px;
+    }
+    .btn-survey-submit {
+        background: #2678b8;
+        color: #ffffff;
+        border: none;
+        border-radius: 999px;
+        padding: 12px 42px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(38, 120, 184, 0.3);
+        transition: background 0.15s, transform 0.15s;
+    }
+    .btn-survey-submit:hover {
+        background: #1f6399;
+        transform: translateY(-1px);
+    }
+    .btn-survey-restart {
+        background: #d8dee6;
+        color: #4a5568;
+        border: none;
+        border-radius: 999px;
+        padding: 8px 26px;
+        font-size: 12.5px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .btn-survey-restart:hover {
+        background: #cbd5e0;
+    }
+
     .chat-footer {
         background: #ffffff;
         border-top: 1px solid #e2e8f0;
@@ -327,10 +459,47 @@ if ($site_id === '') {
         </div>
 
         <?php if ($is_preview): ?>
-        <div class="preview-notice-strip">テストモード中（会話履歴・チケットは保存されません）</div>
+        <div class="preview-notice-strip" id="preview-strip">テストモード中（会話履歴・チケット・評価は保存されません）</div>
         <?php endif; ?>
 
         <div class="chat-messages" id="chat-messages"></div>
+
+        <!-- チャット終了時の満足度アンケート画面（本家再現UI） -->
+        <div class="survey-overlay hidden" id="survey-overlay">
+            <div id="survey-form-body">
+                <div class="survey-title">サポート対応はいかがでしたか？</div>
+                <div class="survey-required-bar">評価<span>※</span></div>
+
+                <div class="survey-thumbs-row">
+                    <button type="button" class="thumb-choice" data-val="satisfied" id="thumb-satisfied">
+                        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#2b7bb9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+                        </svg>
+                        <span>満足</span>
+                    </button>
+                    <button type="button" class="thumb-choice" data-val="dissatisfied" id="thumb-dissatisfied">
+                        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#2b7bb9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+                        </svg>
+                        <span>不満</span>
+                    </button>
+                </div>
+
+                <div class="survey-comment-label">その他、ご意見ございましたら、ご記入いただけますと幸いです。</div>
+                <input type="text" class="survey-comment-input" id="survey-comment-input" placeholder="">
+            </div>
+
+            <div id="survey-thanks-body" style="display:none; text-align:center; padding:45px 12px;">
+                <div style="font-size:18px; font-weight:bold; color:#1a202c; margin-bottom:10px;">ご回答ありがとうございました。</div>
+                <div style="font-size:13px; color:#4a5568; line-height:1.6;">いただいたご意見は今後のサービス改善に役立ててまいります。</div>
+            </div>
+
+            <div class="survey-bottom-area">
+                <button type="button" class="btn-survey-submit" id="btn-submit-survey">アンケートに答える</button>
+                <div style="font-size:12px; color:#718096;" id="survey-closed-note">チャットを終了しました。</div>
+                <button type="button" class="btn-survey-restart" id="btn-restart-from-survey">チャットを再開する</button>
+            </div>
+        </div>
 
         <form class="chat-footer" id="chat-input-form" autocomplete="off">
             <input type="text" class="chat-input" id="chat-text-input" placeholder="質問キーワードやメッセージを入力...">
@@ -346,12 +515,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     const siteId      = <?php echo json_encode($site_id); ?>;
     const initialOpen = <?php echo json_encode($initial_open); ?>;
     const isPreview   = <?php echo json_encode($is_preview); ?>;
-    const sessionKey  = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    let sessionKey    = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 
     let botSetting = null;
     let isMaintenance = false;
     let isOffHours = false;
     let conversationLog = [];
+    let selectedSatisfaction = '';
 
     const avatarSvgs = {
         operator: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-4v8h3c1.66 0 3-1.34 3-3v-7c0-4.97-4.03-9-9-9z"/></svg>',
@@ -389,8 +559,30 @@ document.addEventListener('DOMContentLoaded', async function() {
         notifyParentResize(false);
     }
 
+    function showEndChatSurvey() {
+        selectedSatisfaction = '';
+        document.querySelectorAll('.thumb-choice').forEach(b => b.classList.remove('selected'));
+        document.getElementById('survey-comment-input').value = '';
+        document.getElementById('survey-form-body').style.display = 'block';
+        document.getElementById('survey-thanks-body').style.display = 'none';
+        document.getElementById('btn-submit-survey').style.display = 'inline-block';
+        document.getElementById('survey-closed-note').style.display = 'block';
+        document.getElementById('chat-input-form').classList.add('hidden');
+
+        const overlay = document.getElementById('survey-overlay');
+        const strip = document.getElementById('preview-strip');
+        overlay.style.top = strip ? '82px' : '60px';
+        overlay.classList.remove('hidden');
+    }
+
+    function hideEndChatSurvey() {
+        document.getElementById('survey-overlay').classList.add('hidden');
+        if (botSetting && botSetting.allow_free_input && (!isMaintenance || isPreview)) {
+            document.getElementById('chat-input-form').classList.remove('hidden');
+        }
+    }
+
     async function syncLog() {
-        // プレビュー時はデータベース（履歴・訪問者・レポート）へ一切記録しない
         if (isPreview) return;
         try {
             const fd = new FormData();
@@ -448,6 +640,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
+    function handleNextNodeSelection(nextNodeId) {
+        if (nextNodeId === '__end_chat__') {
+            setTimeout(() => {
+                showEndChatSurvey();
+            }, 250);
+            return;
+        }
+        if (nextNodeId) {
+            renderNode(nextNodeId);
+        }
+    }
+
     function appendFollowupMenu() {
         const box = document.getElementById('chat-messages');
         const tree = botSetting.tree || [];
@@ -479,11 +683,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
         optWrap.appendChild(btnTop);
 
+        const btnEnd = document.createElement('button');
+        btnEnd.type = 'button';
+        btnEnd.className = 'option-btn';
+        btnEnd.innerHTML = '<span>チャット終了</span><span>›</span>';
+        btnEnd.addEventListener('click', () => {
+            disablePreviousOptions();
+            appendUserBubble('チャット終了');
+            handleNextNodeSelection('__end_chat__');
+        });
+        optWrap.appendChild(btnEnd);
+
         box.appendChild(optWrap);
         scrollToBottom();
     }
 
     function renderNode(nodeId) {
+        if (nodeId === '__end_chat__') {
+            showEndChatSurvey();
+            return;
+        }
+
         const tree = botSetting.tree || [];
         const node = tree.find(n => n.id === nodeId) || tree[0];
         if (!node) return;
@@ -509,9 +729,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     btn.addEventListener('click', () => {
                         disablePreviousOptions();
                         appendUserBubble(opt.label);
-                        if (opt.next_node_id) {
-                            renderNode(opt.next_node_id);
-                        }
+                        handleNextNodeSelection(opt.next_node_id);
                     });
                     optWrap.appendChild(btn);
                 });
@@ -554,7 +772,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 return;
             }
 
-            // プレビュー時はチケット起票・メール送信を行わずテスト完了メッセージを表示
             if (isPreview) {
                 formCard.remove();
                 appendUserBubble(`【フォーム送信テスト】\nお名前：${cname}\n内容：${cbody}`);
@@ -585,7 +802,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (data.success) {
                     formCard.remove();
                     appendUserBubble(`【フォーム送信】\nお名前：${cname}\n内容：${cbody}`);
-                    appendBotBubble(`お問い合わせを受け付けました（チケットID: #${data.ticket_id}）。\nご入力いただいたメールアドレス宛に受付完了メールをお送りしましたのでご確認ください。`);
+                    appendBotBubble(`お問い合わせを受け付けました（チケットID: #${data.ticket_id}）。\nご入力いただいたメールアドレス宛に受付完了メールをお送りしましたのでご確認ください。`, () => {
+                        appendFollowupMenu();
+                    });
                 } else {
                     alert(data.error || '送信に失敗しました。');
                     submitBtn.disabled = false;
@@ -603,11 +822,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function startConversation() {
+        hideEndChatSurvey();
         const box = document.getElementById('chat-messages');
         box.innerHTML = '';
         conversationLog = [];
+        sessionKey = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-        // 本番表示時のみメンテナンスモード案内を表示（プレビュー時はテスト操作を優先）
         if (isMaintenance && !isPreview) {
             document.getElementById('chat-input-form').classList.add('hidden');
             box.innerHTML = `
@@ -689,7 +909,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     btn.addEventListener('click', () => {
                         disablePreviousOptions();
                         appendUserBubble(opt.label);
-                        renderNode(opt.next_node_id);
+                        handleNextNodeSelection(opt.next_node_id);
                     });
                     optWrap.appendChild(btn);
                 });
@@ -699,13 +919,59 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
+    // アンケート評価選択・送信イベント
+    document.querySelectorAll('.thumb-choice').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.thumb-choice').forEach(b => b.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedSatisfaction = this.dataset.val;
+        });
+    });
+
+    document.getElementById('btn-submit-survey').addEventListener('click', async function() {
+        if (!selectedSatisfaction) {
+            alert('「満足」または「不満」の評価を選択してください。');
+            return;
+        }
+        const comment = document.getElementById('survey-comment-input').value.trim();
+
+        if (isPreview) {
+            document.getElementById('survey-form-body').style.display = 'none';
+            document.getElementById('survey-thanks-body').style.display = 'block';
+            document.getElementById('btn-submit-survey').style.display = 'none';
+            document.getElementById('survey-closed-note').style.display = 'none';
+            return;
+        }
+
+        this.disabled = true;
+        try {
+            const fd = new FormData();
+            fd.append('action', 'submit_survey');
+            fd.append('site_id', siteId);
+            fd.append('session_key', sessionKey);
+            fd.append('satisfaction', selectedSatisfaction);
+            fd.append('comment', comment);
+            await fetch('bot_api.php', { method: 'POST', body: fd });
+
+            document.getElementById('survey-form-body').style.display = 'none';
+            document.getElementById('survey-thanks-body').style.display = 'block';
+            document.getElementById('btn-submit-survey').style.display = 'none';
+            document.getElementById('survey-closed-note').style.display = 'none';
+        } catch (e) {
+            alert('送信エラーが発生しました。');
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    document.getElementById('btn-restart-from-survey').addEventListener('click', startConversation);
+
     try {
         const res = await fetch('bot_api.php?action=public_config&site=' + encodeURIComponent(siteId), { cache: 'no-store' });
         const data = await res.json();
         if (!data.success || !data.setting) {
             return;
         }
-        // 本番表示時のみ「enabled=0」で非表示にする（プレビュー時は無効でもテスト操作可能）
         if (!data.setting.enabled && !isPreview) {
             return;
         }

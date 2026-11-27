@@ -133,7 +133,7 @@ $base_url = $protocol . $domain . $dir;
         }
         .preview-iframe { width: 100%; flex: 1; border: none; background: transparent; }
 
-        /* ツリーエディタ */
+        /* ツリーエディタ＆ドラッグ並び替え */
         .tree-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
         .tree-nodes-list { display: flex; flex-direction: column; gap: 16px; }
         .tree-node-card {
@@ -147,9 +147,29 @@ $base_url = $protocol . $domain . $dir;
         .tree-node-card.is-start .node-badge { background: #f0fff4; color: #276749; }
         .tree-node-card.is-form .node-badge { background: #fefcbf; color: #744210; }
         .option-edit-row {
-            display: grid; grid-template-columns: 1fr 220px 36px; gap: 8px; align-items: center;
+            display: grid; grid-template-columns: 28px 1fr 240px 36px; gap: 8px; align-items: center;
             background: #f8fafc; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 6px;
+            transition: background 0.15s, border-color 0.15s, opacity 0.15s;
         }
+        .option-edit-row.dragging {
+            opacity: 0.45;
+            background: #ebf8ff;
+            border-color: var(--primary-blue);
+        }
+        .option-edit-row.drag-over {
+            border-top: 3px solid var(--primary-blue);
+        }
+        .drag-handle {
+            cursor: grab;
+            color: #a0aec0;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: center;
+            user-select: none;
+            line-height: 1;
+        }
+        .drag-handle:hover { color: #4a5568; }
+        .drag-handle:active { cursor: grabbing; }
         .btn-del-sm { background: #fff5f5; border: 1px solid #fed7d7; color: #e53e3e; height: 30px; border-radius: 4px; cursor: pointer; font-weight: bold; }
 
         /* ナレッジベース（Q&A）テーブル・カード */
@@ -320,7 +340,7 @@ $base_url = $protocol . $domain . $dir;
                 <div class="preview-sticky">
                     <div class="preview-frame-box">
                         <div class="preview-bar">
-                            <span>📱 テストプレビュー（履歴・チケットには記録されません）</span>
+                            <span>📱 テストプレビュー（履歴・チケット・評価には記録されません）</span>
                             <button type="button" id="btn-reload-preview" style="background:#4a5568; color:#fff; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">再読込</button>
                         </div>
                         <iframe id="bot-preview-iframe" class="preview-iframe" src="about:blank"></iframe>
@@ -335,7 +355,7 @@ $base_url = $protocol . $domain . $dir;
                 <div class="tree-toolbar">
                     <div>
                         <div style="font-size:16px; font-weight:bold; color:#2d3748;">ツリーエディタ（会話シナリオ分岐設定）</div>
-                        <div style="font-size:12px; color:#718096;">「最初の挨拶（node_start）」から始まり、選択肢ボタンごとに次の発言や「お問い合わせ受付フォーム」へ分岐します。</div>
+                        <div style="font-size:12px; color:#718096;">左端の「⋮⋮」をドラッグして選択肢の順序を入れ替えられます。分岐先に「チャット終了（満足度アンケート）」を選ぶと終了時に評価画面へ切り替わります。</div>
                     </div>
                     <button type="button" class="btn-primary" id="btn-add-node">＋ 新しい分岐ステップを追加</button>
                 </div>
@@ -487,6 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentSiteId = '';
     let treeNodes = [];
     let kbList = [];
+    let dragSource = null;
 
     function esc(str) {
         if (str === null || str === undefined) return '';
@@ -505,7 +526,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function reloadPreview() {
         const iframe = document.getElementById('bot-preview-iframe');
-        // preview=1 を付与し、無効時でも操作可能かつDB・履歴・チケットに記録しないテストモードで起動
         iframe.src = `bot.php?site=${encodeURIComponent(currentSiteId)}&preview=1&_t=${Date.now()}`;
     }
 
@@ -551,8 +571,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderTreeEditor() {
         const container = document.getElementById('tree-nodes-container');
         const nodeOptionsHtml = (selectedId) => {
-            return '<option value="">（分岐先なし・終了）</option>' +
-                treeNodes.map(n => `<option value="${esc(n.id)}" ${n.id === selectedId ? 'selected' : ''}>${esc(n.title)} (${esc(n.id)})</option>`).join('');
+            return '<option value="">（分岐先なし・終了）</option>'
+                + `<option value="__end_chat__" ${selectedId === '__end_chat__' ? 'selected' : ''}>🏁 チャット終了（満足度アンケート）</option>`
+                + treeNodes.map(n => `<option value="${esc(n.id)}" ${n.id === selectedId ? 'selected' : ''}>${esc(n.title)} (${esc(n.id)})</option>`).join('');
         };
 
         container.innerHTML = treeNodes.map((node, idx) => {
@@ -562,7 +583,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const badgeText = isStart ? 'スタート地点' : (isForm ? 'チケット自動起票フォーム' : `ステップ #${idx + 1}`);
 
             const optionsRows = (node.options || []).map((opt, oIdx) => `
-                <div class="option-edit-row">
+                <div class="option-edit-row" draggable="true" data-nidx="${idx}" data-oidx="${oIdx}">
+                    <span class="drag-handle" title="ドラッグして順序を変更">⋮⋮</span>
                     <input type="text" class="form-control opt-label" data-nidx="${idx}" data-oidx="${oIdx}" value="${esc(opt.label)}" placeholder="選択肢ボタンの文言">
                     <select class="form-control opt-next" data-nidx="${idx}" data-oidx="${oIdx}">${nodeOptionsHtml(opt.next_node_id)}</select>
                     <button type="button" class="btn-del-sm btn-del-opt" data-nidx="${idx}" data-oidx="${oIdx}" title="選択肢を削除">×</button>
@@ -602,13 +624,67 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${node.action_type !== 'form' ? `
                 <div>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <label style="font-weight:bold; font-size:12px; color:#4a5568;">選択肢ボタン（クリック時の分岐先）</label>
+                        <label style="font-weight:bold; font-size:12px; color:#4a5568;">選択肢ボタン（ドラッグで並び替え・クリック時の分岐先）</label>
                         <button type="button" class="btn-navy btn-add-opt" data-nidx="${idx}" style="padding:4px 10px; font-size:11px;">＋ 選択肢を追加</button>
                     </div>
                     ${optionsRows || '<div style="font-size:11px; color:#a0aec0;">選択肢はありません</div>'}
                 </div>` : '<div style="font-size:12px; color:#9c4221; background:#fffaf0; padding:8px 12px; border-radius:4px;">※このステップに到達すると、チャット内に「お名前・メール・件名・内容」入力フォームが表示され、送信時に既存チケット管理へ自動登録されます。</div>'}
             </div>`;
         }).join('');
+
+        bindOptionDragEvents();
+    }
+
+    function bindOptionDragEvents() {
+        const rows = document.querySelectorAll('.option-edit-row');
+        rows.forEach(row => {
+            row.addEventListener('dragstart', function(e) {
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
+                    e.preventDefault();
+                    return;
+                }
+                dragSource = {
+                    nidx: Number(this.dataset.nidx),
+                    oidx: Number(this.dataset.oidx)
+                };
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            row.addEventListener('dragend', function() {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.option-edit-row').forEach(r => r.classList.remove('drag-over'));
+                dragSource = null;
+            });
+
+            row.addEventListener('dragover', function(e) {
+                if (!dragSource) return;
+                const targetNidx = Number(this.dataset.nidx);
+                if (dragSource.nidx !== targetNidx) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                this.classList.add('drag-over');
+            });
+
+            row.addEventListener('dragleave', function() {
+                this.classList.remove('drag-over');
+            });
+
+            row.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+                if (!dragSource) return;
+                const targetNidx = Number(this.dataset.nidx);
+                const targetOidx = Number(this.dataset.oidx);
+                if (dragSource.nidx !== targetNidx || dragSource.oidx === targetOidx) return;
+
+                const opts = treeNodes[targetNidx].options;
+                const [moved] = opts.splice(dragSource.oidx, 1);
+                opts.splice(targetOidx, 0, moved);
+                dragSource = null;
+                renderTreeEditor();
+            });
+        });
     }
 
     async function loadBotSetting(siteId = '') {
@@ -750,7 +826,10 @@ document.addEventListener('DOMContentLoaded', function() {
             title: '新しい案内ステップ',
             message: '案内メッセージを入力してください。',
             action_type: 'options',
-            options: [{ label: '最初のメニューに戻る', next_node_id: 'node_start' }],
+            options: [
+                { label: '最初のメニューに戻る', next_node_id: 'node_start' },
+                { label: 'チャット終了', next_node_id: '__end_chat__' }
+            ],
             link_label: '',
             link_url: ''
         });
