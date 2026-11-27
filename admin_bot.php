@@ -133,16 +133,44 @@ $base_url = $protocol . $domain . $dir;
         }
         .preview-iframe { width: 100%; flex: 1; border: none; background: transparent; }
 
-        /* ツリーエディタ＆ドラッグ並び替え */
+        /* ツリーエディタ＆ドラッグ並び替え（ステップ＆選択肢の両方対応） */
         .tree-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
         .tree-nodes-list { display: flex; flex-direction: column; gap: 16px; }
         .tree-node-card {
             background: #fff; border: 1px solid #cbd5e0; border-left: 5px solid var(--primary-blue);
             border-radius: 6px; padding: 16px 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+            transition: opacity 0.15s, border-color 0.15s, box-shadow 0.15s;
         }
         .tree-node-card.is-start { border-left-color: #38a169; }
         .tree-node-card.is-form { border-left-color: #d69e2e; }
+        .tree-node-card.node-dragging {
+            opacity: 0.45;
+            box-shadow: 0 6px 18px rgba(41, 163, 229, 0.25);
+        }
+        .tree-node-card.node-drag-over {
+            border-top: 4px solid var(--primary-blue);
+        }
         .node-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; }
+        .node-drag-handle {
+            cursor: grab;
+            color: #718096;
+            font-size: 17px;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 4px;
+            user-select: none;
+            line-height: 1;
+        }
+        .node-drag-handle:hover { background: #edf2f7; color: #2d3748; }
+        .node-drag-handle:active { cursor: grabbing; }
+        .node-move-btns { display: inline-flex; gap: 4px; align-items: center; }
+        .btn-move-node {
+            background: #f7fafc; border: 1px solid #cbd5e0; color: #4a5568;
+            width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;
+        }
+        .btn-move-node:hover:not(:disabled) { background: #ebf8ff; color: var(--primary-blue); border-color: #bee3f8; }
+        .btn-move-node:disabled { opacity: 0.35; cursor: default; }
+
         .node-badge { background: #ebf8ff; color: #2b6cb0; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 4px; }
         .tree-node-card.is-start .node-badge { background: #f0fff4; color: #276749; }
         .tree-node-card.is-form .node-badge { background: #fefcbf; color: #744210; }
@@ -355,7 +383,7 @@ $base_url = $protocol . $domain . $dir;
                 <div class="tree-toolbar">
                     <div>
                         <div style="font-size:16px; font-weight:bold; color:#2d3748;">ツリーエディタ（会話シナリオ分岐設定）</div>
-                        <div style="font-size:12px; color:#718096;">左端の「⋮⋮」をドラッグして選択肢の順序を入れ替えられます。分岐先に「チャット終了（満足度アンケート）」を選ぶと終了時に評価画面へ切り替わります。</div>
+                        <div style="font-size:12px; color:#718096;">ステップカードや選択肢の「⋮⋮」をドラッグ（または「↑」「↓」ボタン）で順序を入れ替えられます。分岐先に「チャット終了（満足度アンケート）」を選ぶと終了時に評価画面へ切り替わります。</div>
                     </div>
                     <button type="button" class="btn-primary" id="btn-add-node">＋ 新しい分岐ステップを追加</button>
                 </div>
@@ -507,7 +535,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentSiteId = '';
     let treeNodes = [];
     let kbList = [];
-    let dragSource = null;
+    let dragOptionSource = null;
+    let dragNodeSourceIdx = null;
 
     function esc(str) {
         if (str === null || str === undefined) return '';
@@ -580,29 +609,37 @@ document.addEventListener('DOMContentLoaded', function() {
             const isStart = (node.id === 'node_start');
             const isForm  = (node.action_type === 'form');
             const cardCls = isStart ? 'is-start' : (isForm ? 'is-form' : '');
-            const badgeText = isStart ? 'スタート地点' : (isForm ? 'チケット自動起票フォーム' : `ステップ #${idx + 1}`);
+            const badgeText = isStart ? 'スタート地点（固定）' : (isForm ? 'チケット自動起票フォーム' : `ステップ #${idx + 1}`);
 
             const optionsRows = (node.options || []).map((opt, oIdx) => `
                 <div class="option-edit-row" draggable="true" data-nidx="${idx}" data-oidx="${oIdx}">
-                    <span class="drag-handle" title="ドラッグして順序を変更">⋮⋮</span>
+                    <span class="drag-handle" title="ドラッグして選択肢の順序を変更">⋮⋮</span>
                     <input type="text" class="form-control opt-label" data-nidx="${idx}" data-oidx="${oIdx}" value="${esc(opt.label)}" placeholder="選択肢ボタンの文言">
                     <select class="form-control opt-next" data-nidx="${idx}" data-oidx="${oIdx}">${nodeOptionsHtml(opt.next_node_id)}</select>
                     <button type="button" class="btn-del-sm btn-del-opt" data-nidx="${idx}" data-oidx="${oIdx}" title="選択肢を削除">×</button>
                 </div>
             `).join('');
 
+            const moveControls = !isStart ? `
+                <div class="node-move-btns">
+                    <button type="button" class="btn-move-node btn-move-up" data-nidx="${idx}" ${idx <= 1 ? 'disabled' : ''} title="上へ移動">↑</button>
+                    <button type="button" class="btn-move-node btn-move-down" data-nidx="${idx}" ${idx >= treeNodes.length - 1 ? 'disabled' : ''} title="下へ移動">↓</button>
+                    <button type="button" class="btn-del-sm btn-del-node" data-nidx="${idx}" style="padding:0 10px; margin-left:4px;">削除</button>
+                </div>` : '';
+
             return `
-            <div class="tree-node-card ${cardCls}">
+            <div class="tree-node-card ${cardCls}" draggable="${!isStart ? 'true' : 'false'}" data-nidx="${idx}">
                 <div class="node-header">
                     <div style="display:flex; align-items:center; gap:10px; flex:1;">
+                        ${!isStart ? '<span class="node-drag-handle" title="ドラッグしてステップの順序を変更">⋮⋮</span>' : ''}
                         <span class="node-badge">${badgeText}</span>
-                        <input type="text" class="form-control node-title" data-nidx="${idx}" value="${esc(node.title)}" style="font-weight:bold; width:260px;" placeholder="ステップ管理名">
-                        <select class="form-control node-action-type" data-nidx="${idx}" style="width:220px;">
+                        <input type="text" class="form-control node-title" data-nidx="${idx}" value="${esc(node.title)}" style="font-weight:bold; width:250px;" placeholder="ステップ管理名">
+                        <select class="form-control node-action-type" data-nidx="${idx}" style="width:215px;">
                             <option value="options" ${node.action_type === 'options' ? 'selected' : ''}>通常メッセージ＋選択肢分岐</option>
                             <option value="form" ${node.action_type === 'form' ? 'selected' : ''}>お問い合わせ受付フォーム表示</option>
                         </select>
                     </div>
-                    ${!isStart ? `<button type="button" class="btn-del-sm btn-del-node" data-nidx="${idx}" style="padding:0 10px;">削除</button>` : ''}
+                    ${moveControls}
                 </div>
 
                 <div class="form-group">
@@ -633,17 +670,69 @@ document.addEventListener('DOMContentLoaded', function() {
         }).join('');
 
         bindOptionDragEvents();
+        bindNodeDragEvents();
     }
 
+    // ステップカード自体のドラッグ＆ドロップ並び替え（node_startは先頭固定）
+    function bindNodeDragEvents() {
+        const cards = document.querySelectorAll('.tree-node-card');
+        cards.forEach(card => {
+            const idx = Number(card.dataset.nidx);
+            if (idx === 0) return; // スタート地点は固定
+
+            card.addEventListener('dragstart', function(e) {
+                // 子要素の選択肢行や入力欄のドラッグ時は親カードドラッグを発火しない
+                if (e.target !== this) return;
+                dragNodeSourceIdx = idx;
+                this.classList.add('node-dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            card.addEventListener('dragend', function() {
+                this.classList.remove('node-dragging');
+                document.querySelectorAll('.tree-node-card').forEach(c => c.classList.remove('node-drag-over'));
+                dragNodeSourceIdx = null;
+            });
+
+            card.addEventListener('dragover', function(e) {
+                if (dragNodeSourceIdx === null) return;
+                const targetIdx = Number(this.dataset.nidx);
+                if (targetIdx === 0 || dragNodeSourceIdx === targetIdx) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                this.classList.add('node-drag-over');
+            });
+
+            card.addEventListener('dragleave', function() {
+                this.classList.remove('node-drag-over');
+            });
+
+            card.addEventListener('drop', function(e) {
+                if (dragNodeSourceIdx === null) return;
+                e.preventDefault();
+                this.classList.remove('node-drag-over');
+                const targetIdx = Number(this.dataset.nidx);
+                if (targetIdx === 0 || dragNodeSourceIdx === targetIdx) return;
+
+                const [movedNode] = treeNodes.splice(dragNodeSourceIdx, 1);
+                treeNodes.splice(targetIdx, 0, movedNode);
+                dragNodeSourceIdx = null;
+                renderTreeEditor();
+            });
+        });
+    }
+
+    // 選択肢ボタンのドラッグ＆ドロップ並び替え
     function bindOptionDragEvents() {
         const rows = document.querySelectorAll('.option-edit-row');
         rows.forEach(row => {
             row.addEventListener('dragstart', function(e) {
+                e.stopPropagation();
                 if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
                     e.preventDefault();
                     return;
                 }
-                dragSource = {
+                dragOptionSource = {
                     nidx: Number(this.dataset.nidx),
                     oidx: Number(this.dataset.oidx)
                 };
@@ -651,37 +740,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.dataTransfer.effectAllowed = 'move';
             });
 
-            row.addEventListener('dragend', function() {
+            row.addEventListener('dragend', function(e) {
+                e.stopPropagation();
                 this.classList.remove('dragging');
                 document.querySelectorAll('.option-edit-row').forEach(r => r.classList.remove('drag-over'));
-                dragSource = null;
+                dragOptionSource = null;
             });
 
             row.addEventListener('dragover', function(e) {
-                if (!dragSource) return;
+                if (!dragOptionSource) return;
+                e.stopPropagation();
                 const targetNidx = Number(this.dataset.nidx);
-                if (dragSource.nidx !== targetNidx) return;
+                if (dragOptionSource.nidx !== targetNidx) return;
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
                 this.classList.add('drag-over');
             });
 
-            row.addEventListener('dragleave', function() {
+            row.addEventListener('dragleave', function(e) {
+                e.stopPropagation();
                 this.classList.remove('drag-over');
             });
 
             row.addEventListener('drop', function(e) {
+                if (!dragOptionSource) return;
                 e.preventDefault();
+                e.stopPropagation();
                 this.classList.remove('drag-over');
-                if (!dragSource) return;
                 const targetNidx = Number(this.dataset.nidx);
                 const targetOidx = Number(this.dataset.oidx);
-                if (dragSource.nidx !== targetNidx || dragSource.oidx === targetOidx) return;
+                if (dragOptionSource.nidx !== targetNidx || dragOptionSource.oidx === targetOidx) return;
 
                 const opts = treeNodes[targetNidx].options;
-                const [moved] = opts.splice(dragSource.oidx, 1);
+                const [moved] = opts.splice(dragOptionSource.oidx, 1);
                 opts.splice(targetOidx, 0, moved);
-                dragSource = null;
+                dragOptionSource = null;
                 renderTreeEditor();
             });
         });
@@ -892,6 +985,22 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        if (e.target.classList.contains('btn-move-up')) {
+            const idx = Number(e.target.dataset.nidx);
+            if (idx > 1) {
+                const [moved] = treeNodes.splice(idx, 1);
+                treeNodes.splice(idx - 1, 0, moved);
+                renderTreeEditor();
+            }
+        }
+        if (e.target.classList.contains('btn-move-down')) {
+            const idx = Number(e.target.dataset.nidx);
+            if (idx >= 1 && idx < treeNodes.length - 1) {
+                const [moved] = treeNodes.splice(idx, 1);
+                treeNodes.splice(idx + 1, 0, moved);
+                renderTreeEditor();
+            }
+        }
         if (e.target.classList.contains('btn-add-opt')) {
             const idx = Number(e.target.dataset.nidx);
             treeNodes[idx].options = treeNodes[idx].options || [];
