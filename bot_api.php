@@ -61,7 +61,6 @@ try {
         INDEX idx_site_id (site_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    // 既存bot_logsテーブルへのカラム補完
     $log_cols = $pdo->query("SHOW COLUMNS FROM bot_logs")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array('page_url', $log_cols)) {
         $pdo->exec("ALTER TABLE bot_logs ADD COLUMN page_url VARCHAR(255) NOT NULL DEFAULT '' AFTER visitor_email");
@@ -514,9 +513,10 @@ try {
 
     // 2. フリーワード質問に対するナレッジベース（Q&A）検索応答
     if ($action === 'ask_knowledge') {
-        $site_id = trim($_POST['site_id'] ?? ($_GET['site_id'] ?? ''));
-        $query   = trim($_POST['query'] ?? ($_GET['query'] ?? ''));
-        $kb_id   = (int)($_POST['kb_id'] ?? ($_GET['kb_id'] ?? 0));
+        $site_id    = trim($_POST['site_id'] ?? ($_GET['site_id'] ?? ''));
+        $query      = trim($_POST['query'] ?? ($_GET['query'] ?? ''));
+        $kb_id      = (int)($_POST['kb_id'] ?? ($_GET['kb_id'] ?? 0));
+        $is_preview = !empty($_REQUEST['preview']);
 
         $site = get_site_by_id($config, $site_id);
         if (!$site) {
@@ -528,7 +528,9 @@ try {
             $stmt->execute([$kb_id, $site_id]);
             $item = $stmt->fetch();
             if ($item) {
-                $pdo->prepare("UPDATE bot_knowledge SET hit_count = hit_count + 1 WHERE id = ?")->execute([$item['id']]);
+                if (!$is_preview) {
+                    $pdo->prepare("UPDATE bot_knowledge SET hit_count = hit_count + 1 WHERE id = ?")->execute([$item['id']]);
+                }
                 echo json_encode([
                     'success' => true,
                     'mode'    => 'direct',
@@ -550,7 +552,9 @@ try {
 
         if (count($matches) === 1 || ($matches[0]['score'] >= 55 && ($matches[0]['score'] - $matches[1]['score']) >= 20)) {
             $top = $matches[0];
-            $pdo->prepare("UPDATE bot_knowledge SET hit_count = hit_count + 1 WHERE id = ?")->execute([$top['id']]);
+            if (!$is_preview) {
+                $pdo->prepare("UPDATE bot_knowledge SET hit_count = hit_count + 1 WHERE id = ?")->execute([$top['id']]);
+            }
             echo json_encode([
                 'success' => true,
                 'mode'    => 'direct',
@@ -578,8 +582,13 @@ try {
         exit;
     }
 
-    // 3. チャット会話ログ＆訪問者情報の保存
+    // 3. チャット会話ログ＆訪問者情報の保存（プレビュー時は記録しない）
     if ($action === 'save_log') {
+        if (!empty($_POST['preview'])) {
+            echo json_encode(['success' => true, 'preview' => true]);
+            exit;
+        }
+
         $site_id     = trim($_POST['site_id'] ?? '');
         $session_key = trim($_POST['session_key'] ?? '');
         $messages    = $_POST['messages_json'] ?? '[]';
@@ -607,8 +616,17 @@ try {
         exit;
     }
 
-    // 4. チャット内ヒアリングフォーム送信 → 既存チケットシステムへ自動起票
+    // 4. チャット内ヒアリングフォーム送信 → 既存チケットシステムへ自動起票（プレビュー時は起票しない）
     if ($action === 'submit_ticket') {
+        if (!empty($_POST['preview'])) {
+            echo json_encode([
+                'success'   => true,
+                'preview'   => true,
+                'ticket_id' => 0
+            ]);
+            exit;
+        }
+
         if (!empty($config['maintenance_mode'])) {
             throw new Exception('現在メンテナンス中のため、受付を一時休止しております。');
         }
@@ -975,7 +993,7 @@ try {
     // フェーズ3：訪問者モニター・会話履歴一覧・レポート集計API
     // ==================================================
 
-    // 12. 訪問者モニター一覧取得（直近24時間およびアクティブ判定）
+    // 12. 訪問者モニター一覧取得
     if ($action === 'visitors_list') {
         $site_id = trim($_GET['site_id'] ?? '');
         $where = ["updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"];
@@ -997,7 +1015,7 @@ try {
         foreach ($rows as $r) {
             $updated_ts = strtotime($r['updated_at']);
             $diff_sec = max(0, $now - $updated_ts);
-            $is_online = ($diff_sec <= 300); // 5分以内の操作は「オンライン対応中」
+            $is_online = ($diff_sec <= 300);
             if ($is_online) $active_count++;
 
             $msgs = json_decode($r['messages_json'] ?: '[]', true);
@@ -1050,7 +1068,7 @@ try {
         exit;
     }
 
-    // 13. 会話履歴一覧取得（検索・絞り込み対応）
+    // 13. 会話履歴一覧取得
     if ($action === 'logs_list') {
         $where = [];
         $params = [];
@@ -1157,7 +1175,6 @@ try {
         $daily_map = [];
         $choice_counts = [];
 
-        // 期間内の全日付キーを初期化
         $cur_ts = strtotime($start_date);
         $end_ts = strtotime($end_date);
         while ($cur_ts <= $end_ts && count($daily_map) < 90) {
@@ -1204,7 +1221,6 @@ try {
             $top_choices[] = ['label' => $label, 'count' => $cnt];
         }
 
-        // ナレッジベース人気ランキング
         if ($site_id !== '') {
             $stmt_kb = $pdo->prepare("SELECT id, category, question, hit_count FROM bot_knowledge WHERE site_id = ? AND hit_count > 0 ORDER BY hit_count DESC LIMIT 8");
             $stmt_kb->execute([$site_id]);

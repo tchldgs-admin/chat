@@ -5,6 +5,7 @@ header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 
 $site_id = trim($_GET['site'] ?? '');
 $initial_open = !empty($_GET['open']);
+$is_preview = !empty($_GET['preview']); // 管理画面プレビュー用フラグ
 if ($site_id === '') {
     http_response_code(404);
     exit;
@@ -160,6 +161,12 @@ if ($site_id === '') {
         display: flex; align-items: center; justify-content: center; font-size: 15px;
     }
     .btn-header-icon:hover { background: rgba(255,255,255,0.32); }
+
+    .preview-notice-strip {
+        background: #fefcbf; color: #744210; font-size: 11px; font-weight: bold;
+        padding: 4px 10px; text-align: center; border-bottom: 1px solid #f6e05e;
+        flex-shrink: 0;
+    }
 
     .chat-messages {
         flex: 1;
@@ -319,6 +326,10 @@ if ($site_id === '') {
             </div>
         </div>
 
+        <?php if ($is_preview): ?>
+        <div class="preview-notice-strip">テストモード中（会話履歴・チケットは保存されません）</div>
+        <?php endif; ?>
+
         <div class="chat-messages" id="chat-messages"></div>
 
         <form class="chat-footer" id="chat-input-form" autocomplete="off">
@@ -332,9 +343,10 @@ if ($site_id === '') {
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
-    const siteId = <?php echo json_encode($site_id); ?>;
+    const siteId      = <?php echo json_encode($site_id); ?>;
     const initialOpen = <?php echo json_encode($initial_open); ?>;
-    const sessionKey = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const isPreview   = <?php echo json_encode($is_preview); ?>;
+    const sessionKey  = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 
     let botSetting = null;
     let isMaintenance = false;
@@ -378,6 +390,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     async function syncLog() {
+        // プレビュー時はデータベース（履歴・訪問者・レポート）へ一切記録しない
+        if (isPreview) return;
         try {
             const fd = new FormData();
             fd.append('action', 'save_log');
@@ -521,7 +535,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             <div class="itf-group"><label>メールアドレス *</label><input type="email" class="itf-input" name="cemail" required placeholder="例：taro@example.com"></div>
             <div class="itf-group"><label>件名 *</label><input type="text" class="itf-input" name="csubject" required value="チャットボットからのお問い合わせ"></div>
             <div class="itf-group"><label>お問い合わせ内容 *</label><textarea class="itf-input" name="cbody" rows="3" required placeholder="ご用件をご入力ください"></textarea></div>
-            <button type="button" class="itf-submit">この内容で送信する</button>
+            <button type="button" class="itf-submit">${isPreview ? '送信テストを実行する' : 'この内容で送信する'}</button>
         `;
 
         const submitBtn = formCard.querySelector('.itf-submit');
@@ -533,6 +547,20 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             if (!cname || !cemail || !cbody) {
                 alert('お名前・メールアドレス・お問い合わせ内容を入力してください。');
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cemail)) {
+                alert('正しいメールアドレスを入力してください。');
+                return;
+            }
+
+            // プレビュー時はチケット起票・メール送信を行わずテスト完了メッセージを表示
+            if (isPreview) {
+                formCard.remove();
+                appendUserBubble(`【フォーム送信テスト】\nお名前：${cname}\n内容：${cbody}`);
+                appendBotBubble(`【テストプレビュー完了】\n実際の本番画面ではこの内容でチケット管理へ自動登録され、${cemail} 宛に受付完了メールが送信されます。\n（※テストモードのため、データベースへの起票・メール送信は行われていません）`, () => {
+                    appendFollowupMenu();
+                });
                 return;
             }
 
@@ -579,7 +607,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         box.innerHTML = '';
         conversationLog = [];
 
-        if (isMaintenance) {
+        // 本番表示時のみメンテナンスモード案内を表示（プレビュー時はテスト操作を優先）
+        if (isMaintenance && !isPreview) {
             document.getElementById('chat-input-form').classList.add('hidden');
             box.innerHTML = `
                 <div class="maint-box">
@@ -590,7 +619,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
 
-        if (isOffHours && botSetting.off_hours_message) {
+        if (isOffHours && botSetting.off_hours_message && !isPreview) {
             appendBotBubble(botSetting.off_hours_message, () => {
                 renderNode('node_start');
             });
@@ -603,6 +632,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const fd = new FormData();
         fd.append('action', 'ask_knowledge');
         fd.append('site_id', siteId);
+        if (isPreview) fd.append('preview', '1');
         if (queryText) fd.append('query', queryText);
         if (kbId > 0) fd.append('kb_id', String(kbId));
 
@@ -643,7 +673,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.error(e);
         }
 
-        // ナレッジに該当しない場合はフォールバック応答＋スタートメニュー
         const fb = botSetting.fallback_message || 'ご質問ありがとうございます。下のメニューからお選びいただくか、お問い合わせフォームをご利用ください。';
         appendBotBubble(fb, () => {
             const tree = botSetting.tree || [];
@@ -673,7 +702,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     try {
         const res = await fetch('bot_api.php?action=public_config&site=' + encodeURIComponent(siteId), { cache: 'no-store' });
         const data = await res.json();
-        if (!data.success || !data.setting || !data.setting.enabled) {
+        if (!data.success || !data.setting) {
+            return;
+        }
+        // 本番表示時のみ「enabled=0」で非表示にする（プレビュー時は無効でもテスト操作可能）
+        if (!data.setting.enabled && !isPreview) {
             return;
         }
 
@@ -695,7 +728,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('launcher-btn-text').textContent = botSetting.launcher_text || 'お問い合わせはこちらをクリック';
         }
 
-        if (botSetting.eyecatcher_enabled && !isMaintenance) {
+        if (botSetting.eyecatcher_enabled && (!isMaintenance || isPreview)) {
             const ecWrap = document.getElementById('eyecatcher-wrap');
             const ecContent = document.getElementById('eyecatcher-content');
             if (botSetting.eyecatcher_url) {
@@ -721,7 +754,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         if (initialOpen) {
             openChatWindow();
-        } else if (botSetting.auto_open_seconds > 0 && !isMaintenance) {
+        } else if (botSetting.auto_open_seconds > 0 && !isMaintenance && !isPreview) {
             setTimeout(() => {
                 if (!document.getElementById('launcher-container').classList.contains('hidden')) {
                     openChatWindow();

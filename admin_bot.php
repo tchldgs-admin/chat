@@ -320,7 +320,7 @@ $base_url = $protocol . $domain . $dir;
                 <div class="preview-sticky">
                     <div class="preview-frame-box">
                         <div class="preview-bar">
-                            <span>📱 実際のサイト表示プレビュー（操作可能）</span>
+                            <span>📱 テストプレビュー（履歴・チケットには記録されません）</span>
                             <button type="button" id="btn-reload-preview" style="background:#4a5568; color:#fff; border:none; padding:3px 8px; border-radius:3px; font-size:11px; cursor:pointer;">再読込</button>
                         </div>
                         <iframe id="bot-preview-iframe" class="preview-iframe" src="about:blank"></iframe>
@@ -505,7 +505,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function reloadPreview() {
         const iframe = document.getElementById('bot-preview-iframe');
-        iframe.src = `bot.php?site=${encodeURIComponent(currentSiteId)}&_t=${Date.now()}`;
+        // preview=1 を付与し、無効時でも操作可能かつDB・履歴・チケットに記録しないテストモードで起動
+        iframe.src = `bot.php?site=${encodeURIComponent(currentSiteId)}&preview=1&_t=${Date.now()}`;
     }
 
     function renderKnowledgeList() {
