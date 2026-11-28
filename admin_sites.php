@@ -346,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function buildGtmBotCode(siteId) {
         const safeId = String(siteId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        return `<script>\n(function() {\n  var siteId = '${safeId}';\n  if (document.getElementById('tc-plus-bot-iframe')) return;\n  var iframe = document.createElement('iframe');\n  iframe.id = 'tc-plus-bot-iframe';\n  iframe.src = '${baseUrl}/bot.php?site=' + encodeURIComponent(siteId);\n  iframe.style.position = 'fixed';\n  iframe.style.bottom = '0px';\n  iframe.style.right = '16px';\n  iframe.style.width = '390px';\n  iframe.style.height = '580px';\n  iframe.style.maxWidth = '95vw';\n  iframe.style.maxHeight = '88vh';\n  iframe.style.border = 'none';\n  iframe.style.zIndex = '99999';\n  iframe.style.background = 'transparent';\n  iframe.setAttribute('allowtransparency', 'true');\n  document.body.appendChild(iframe);\n})();\n<\/script>`;
+        return `<script>\n(function() {\n  var siteId = '${safeId}';\n  if (document.getElementById('tc-plus-bot-iframe')) return;\n  var iframe = document.createElement('iframe');\n  iframe.id = 'tc-plus-bot-iframe';\n  iframe.src = '${baseUrl}/bot.php?site=' + encodeURIComponent(siteId);\n  iframe.style.position = 'fixed';\n  iframe.style.bottom = '0px';\n  iframe.style.right = '8px';\n  iframe.style.width = '290px';\n  iframe.style.height = '165px';\n  iframe.style.maxWidth = '96vw';\n  iframe.style.maxHeight = '88vh';\n  iframe.style.border = 'none';\n  iframe.style.zIndex = '99999';\n  iframe.style.background = 'transparent';\n  iframe.setAttribute('allowtransparency', 'true');\n  window.addEventListener('message', function(e) {\n    if (!e.data || e.data.type !== 'tc_plus_bot_resize') return;\n    if (e.data.site && e.data.site !== siteId) return;\n    if (e.data.open) {\n      iframe.style.width = '390px';\n      iframe.style.height = '580px';\n    } else {\n      iframe.style.width = '290px';\n      iframe.style.height = '165px';\n    }\n  });\n  document.body.appendChild(iframe);\n})();\n<\/script>`;
     }
 
     async function loadSites() {
@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="embed-header">
                                 <span class="embed-label" style="color:#2b6cb0;">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
-                                    <span>GTM用 チャットボット（カスタムHTML）</span>
+                                    <span>GTM用 チャットボット（自動リサイズ対応）</span>
                                 </span>
                                 <button type="button" class="btn-copy" style="background:#29a3e5;">
                                     <span>コピー</span>

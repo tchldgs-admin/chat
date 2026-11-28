@@ -69,7 +69,6 @@ $base_url = $protocol . $domain . $dir;
         body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; color: var(--text-main); font-size: 13px; background: var(--bg-light); }
         svg { vertical-align: middle; flex-shrink: 0; }
 
-        /* 上部ヘッダー */
         #top-header {
             height: 54px; background: #ffffff; border-bottom: 1px solid var(--border-color);
             display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
@@ -87,7 +86,6 @@ $base_url = $protocol . $domain . $dir;
 
         .layout-wrapper { display: flex; padding-top: 54px; min-height: 100vh; }
 
-        /* 左サイドバー */
         .sidebar { width: 195px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 16px 0; position: fixed; top: 54px; bottom: 0; left: 0; overflow-y: auto; }
         .side-group-title { font-size: 11px; color: #a0aec0; font-weight: bold; padding: 0 18px; margin-bottom: 4px; margin-top: 16px; }
         .side-menu { list-style: none; }
@@ -95,7 +93,6 @@ $base_url = $protocol . $domain . $dir;
         .side-menu li a:hover { background: #e8edf3; }
         .side-menu li.active a { background: #e2ecf7; color: #1a365d; font-weight: bold; border-left: 3px solid var(--primary-blue); }
 
-        /* メインエリア */
         .main-content { flex: 1; margin-left: 195px; padding: 22px 28px; }
         .top-bar-controls {
             background: #fff; border: 1px solid var(--border-color); border-radius: 6px;
@@ -113,7 +110,6 @@ $base_url = $protocol . $domain . $dir;
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
 
-        /* デザイン設定2カラム */
         .design-grid { display: grid; grid-template-columns: 1fr 410px; gap: 20px; align-items: start; }
         .card-box { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 20px; margin-bottom: 16px; }
         .card-title { font-size: 15px; font-weight: bold; color: #2d3748; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 16px; }
@@ -133,7 +129,6 @@ $base_url = $protocol . $domain . $dir;
         }
         .preview-iframe { width: 100%; flex: 1; border: none; background: transparent; }
 
-        /* ツリーエディタ＆ドラッグ並び替え（ステップ＆選択肢の両方対応） */
         .tree-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
         .tree-nodes-list { display: flex; flex-direction: column; gap: 16px; }
         .tree-node-card {
@@ -200,7 +195,6 @@ $base_url = $protocol . $domain . $dir;
         .drag-handle:active { cursor: grabbing; }
         .btn-del-sm { background: #fff5f5; border: 1px solid #fed7d7; color: #e53e3e; height: 30px; border-radius: 4px; cursor: pointer; font-weight: bold; }
 
-        /* ナレッジベース（Q&A）テーブル・カード */
         .kb-toolbar {
             display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;
             margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);
@@ -217,7 +211,6 @@ $base_url = $protocol . $domain . $dir;
         .kb-q { font-size: 14px; font-weight: bold; color: #2d3748; margin-bottom: 6px; }
         .kb-a { font-size: 12.5px; color: #4a5568; white-space: pre-wrap; line-height: 1.55; background: #f8fafc; padding: 8px 10px; border-radius: 4px; }
 
-        /* モーダル */
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; }
         .modal-overlay.open { display: flex; }
         .modal-dialog { background: #fff; width: 540px; max-width: 94vw; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; }
@@ -434,11 +427,11 @@ $base_url = $protocol . $domain . $dir;
 
                     <div class="form-group" style="margin-bottom:0;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <label style="margin-bottom:0;">② GTM用 カスタムHTMLコード（Googleタグマネージャー向け）</label>
+                            <label style="margin-bottom:0;">② GTM用 カスタムHTMLコード（自動リサイズ対応）</label>
                             <button type="button" class="btn-copy-code" data-target="bot-gtm-code" style="background:#29a3e5;">コピー</button>
                         </div>
                         <textarea id="bot-gtm-code" class="embed-code-box" readonly onclick="this.select();"></textarea>
-                        <div class="form-note">※GTMの「カスタムHTML」タグへそのまま貼り付けて配信できます。</div>
+                        <div class="form-note">※GTMの「カスタムHTML」タグへそのまま貼り付けて配信できます（開閉に応じて自動伸縮）。</div>
                     </div>
                 </div>
             </div>
@@ -546,7 +539,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateEmbedCode() {
         const iframeCode = `<iframe src="${baseUrl}/bot.php?site=${encodeURIComponent(currentSiteId)}" style="position:fixed; bottom:0; right:16px; width:390px; height:580px; max-width:95vw; max-height:88vh; border:none; z-index:99999; background:transparent;" allowtransparency="true"></iframe>`;
         const safeId = String(currentSiteId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        const gtmCode = `<script>\n(function() {\n  var siteId = '${safeId}';\n  if (document.getElementById('tc-plus-bot-iframe')) return;\n  var iframe = document.createElement('iframe');\n  iframe.id = 'tc-plus-bot-iframe';\n  iframe.src = '${baseUrl}/bot.php?site=' + encodeURIComponent(siteId);\n  iframe.style.position = 'fixed';\n  iframe.style.bottom = '0px';\n  iframe.style.right = '16px';\n  iframe.style.width = '390px';\n  iframe.style.height = '580px';\n  iframe.style.maxWidth = '95vw';\n  iframe.style.maxHeight = '88vh';\n  iframe.style.border = 'none';\n  iframe.style.zIndex = '99999';\n  iframe.style.background = 'transparent';\n  iframe.setAttribute('allowtransparency', 'true');\n  document.body.appendChild(iframe);\n})();\n<\/script>`;
+        const gtmCode = `<script>\n(function() {\n  var siteId = '${safeId}';\n  if (document.getElementById('tc-plus-bot-iframe')) return;\n  var iframe = document.createElement('iframe');\n  iframe.id = 'tc-plus-bot-iframe';\n  iframe.src = '${baseUrl}/bot.php?site=' + encodeURIComponent(siteId);\n  iframe.style.position = 'fixed';\n  iframe.style.bottom = '0px';\n  iframe.style.right = '8px';\n  iframe.style.width = '290px';\n  iframe.style.height = '165px';\n  iframe.style.maxWidth = '96vw';\n  iframe.style.maxHeight = '88vh';\n  iframe.style.border = 'none';\n  iframe.style.zIndex = '99999';\n  iframe.style.background = 'transparent';\n  iframe.setAttribute('allowtransparency', 'true');\n  window.addEventListener('message', function(e) {\n    if (!e.data || e.data.type !== 'tc_plus_bot_resize') return;\n    if (e.data.site && e.data.site !== siteId) return;\n    if (e.data.open) {\n      iframe.style.width = '390px';\n      iframe.style.height = '580px';\n    } else {\n      iframe.style.width = '290px';\n      iframe.style.height = '165px';\n    }\n  });\n  document.body.appendChild(iframe);\n})();\n<\/script>`;
 
         document.getElementById('bot-iframe-code').value = iframeCode;
         document.getElementById('bot-gtm-code').value = gtmCode;
@@ -673,15 +666,13 @@ document.addEventListener('DOMContentLoaded', function() {
         bindNodeDragEvents();
     }
 
-    // ステップカード自体のドラッグ＆ドロップ並び替え（node_startは先頭固定）
     function bindNodeDragEvents() {
         const cards = document.querySelectorAll('.tree-node-card');
         cards.forEach(card => {
             const idx = Number(card.dataset.nidx);
-            if (idx === 0) return; // スタート地点は固定
+            if (idx === 0) return;
 
             card.addEventListener('dragstart', function(e) {
-                // 子要素の選択肢行や入力欄のドラッグ時は親カードドラッグを発火しない
                 if (e.target !== this) return;
                 dragNodeSourceIdx = idx;
                 this.classList.add('node-dragging');
@@ -722,7 +713,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 選択肢ボタンのドラッグ＆ドロップ並び替え
     function bindOptionDragEvents() {
         const rows = document.querySelectorAll('.option-edit-row');
         rows.forEach(row => {
@@ -826,7 +816,6 @@ document.addEventListener('DOMContentLoaded', function() {
         reloadPreview();
     }
 
-    // サイドタブ切替
     document.querySelectorAll('#bot-side-tabs li').forEach(li => {
         li.addEventListener('click', function() {
             document.querySelectorAll('#bot-side-tabs li').forEach(x => x.classList.remove('active'));
@@ -844,7 +833,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btn-reload-preview').addEventListener('click', reloadPreview);
     document.getElementById('kb-search-input').addEventListener('input', renderKnowledgeList);
 
-    // ナレッジベース操作
     document.getElementById('btn-kb-add').addEventListener('click', function() {
         document.getElementById('form-kb').reset();
         document.getElementById('kb-id').value = '0';
@@ -911,7 +899,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ツリーエディタ操作
     document.getElementById('btn-add-node').addEventListener('click', function() {
         const newId = 'node_' + Math.random().toString(36).slice(2, 8);
         treeNodes.push({
@@ -1050,7 +1037,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // アイキャッチャー画像アップロード
     const fileInput = document.getElementById('eyecatcher-file-input');
     document.getElementById('btn-upload-eyecatcher').addEventListener('click', () => fileInput.click());
     document.getElementById('btn-clear-eyecatcher').addEventListener('click', () => {
@@ -1073,7 +1059,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 保存処理
     const btnSave = document.getElementById('btn-save-bot');
     if (btnSave) {
         btnSave.addEventListener('click', async function() {
