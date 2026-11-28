@@ -652,14 +652,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    function appendFollowupMenu() {
+    // includeInquiry: チケット起票直後のみ false を渡して「解決しないので問い合わせる」を非表示にする
+    function appendFollowupMenu(includeInquiry = true) {
         const box = document.getElementById('chat-messages');
         const tree = botSetting.tree || [];
         const formNode = tree.find(n => n.action_type === 'form');
         const optWrap = document.createElement('div');
         optWrap.className = 'options-list';
 
-        if (formNode) {
+        if (includeInquiry && formNode) {
             const btnForm = document.createElement('button');
             btnForm.type = 'button';
             btnForm.className = 'option-btn';
@@ -776,7 +777,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 formCard.remove();
                 appendUserBubble(`【フォーム送信テスト】\nお名前：${cname}\n内容：${cbody}`);
                 appendBotBubble(`【テストプレビュー完了】\n実際の本番画面ではこの内容でチケット管理へ自動登録され、${cemail} 宛に受付完了メールが送信されます。\n（※テストモードのため、データベースへの起票・メール送信は行われていません）`, () => {
-                    appendFollowupMenu();
+                    appendFollowupMenu(false);
                 });
                 return;
             }
@@ -803,7 +804,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     formCard.remove();
                     appendUserBubble(`【フォーム送信】\nお名前：${cname}\n内容：${cbody}`);
                     appendBotBubble(`お問い合わせを受け付けました（チケットID: #${data.ticket_id}）。\nご入力いただいたメールアドレス宛に受付完了メールをお送りしましたのでご確認ください。`, () => {
-                        appendFollowupMenu();
+                        appendFollowupMenu(false);
                     });
                 } else {
                     alert(data.error || '送信に失敗しました。');
@@ -862,7 +863,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             if (data.success && data.mode === 'direct' && data.match) {
                 appendBotBubble(data.match.answer, () => {
-                    appendFollowupMenu();
+                    appendFollowupMenu(true);
                 }, data.match.category || 'Q&A回答');
                 return;
             }
