@@ -95,22 +95,28 @@ if ($site_id === '') {
     }
     .ec-main-txt { font-size: 12px; font-weight: bold; color: #2d3748; }
 
+    /* 下部起動バー：必ず1行で収まるように white-space: nowrap と幅・余白を最適化 */
     .launcher-bar {
         background: var(--theme-color);
         color: #ffffff;
         border: none;
         border-radius: 6px;
-        padding: 12px 22px;
-        min-width: 260px;
-        font-size: 13.5px;
+        padding: 11px 16px;
+        max-width: 100%;
+        font-size: 13px;
         font-weight: bold;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
         cursor: pointer;
         box-shadow: 0 4px 14px rgba(0,0,0,0.22);
-        display: flex; align-items: center; justify-content: center; gap: 8px;
+        display: inline-flex; align-items: center; justify-content: center; gap: 7px;
         transition: filter 0.15s, transform 0.15s;
     }
+    .launcher-bar svg { flex-shrink: 0; }
     .launcher-bar:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    @media (max-width: 300px) {
+        .launcher-bar { font-size: 11.5px; padding: 10px 12px; gap: 5px; }
+    }
 
     .launcher-circle {
         width: 60px; height: 60px; border-radius: 50%;
@@ -438,7 +444,7 @@ if ($site_id === '') {
             <div id="eyecatcher-content"></div>
         </div>
         <button type="button" class="launcher-bar" id="launcher-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
             <span id="launcher-btn-text">お問い合わせはこちらをクリック</span>
         </button>
     </div>
@@ -522,6 +528,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     let isOffHours = false;
     let conversationLog = [];
     let selectedSatisfaction = '';
+    let isEyecatcherHidden = false;
 
     const avatarSvgs = {
         operator: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-4v8h3c1.66 0 3-1.34 3-3v-7c0-4.97-4.03-9-9-9z"/></svg>',
@@ -536,10 +543,12 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function notifyParentResize(isOpen) {
         try {
+            const ecVisible = document.getElementById('eyecatcher-wrap').style.display !== 'none';
             window.parent.postMessage({
                 type: 'tc_plus_bot_resize',
                 site: siteId,
-                open: isOpen
+                open: isOpen,
+                compact: !isOpen && !ecVisible
             }, '*');
         } catch (e) {}
     }
@@ -652,7 +661,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // includeInquiry: チケット起票直後のみ false を渡して「解決しないので問い合わせる」を非表示にする
     function appendFollowupMenu(includeInquiry = true) {
         const box = document.getElementById('chat-messages');
         const tree = botSetting.tree || [];
@@ -920,7 +928,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
-    // アンケート評価選択・送信イベント
     document.querySelectorAll('.thumb-choice').forEach(btn => {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.thumb-choice').forEach(b => b.classList.remove('selected'));
@@ -1011,6 +1018,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     </div>`;
             }
             ecWrap.style.display = 'block';
+        } else {
+            notifyParentResize(false);
         }
 
         if (!botSetting.allow_free_input) {
@@ -1037,7 +1046,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('eyecatcher-content').addEventListener('click', openChatWindow);
     document.getElementById('eyecatcher-close').addEventListener('click', function(e) {
         e.stopPropagation();
+        isEyecatcherHidden = true;
         document.getElementById('eyecatcher-wrap').style.display = 'none';
+        notifyParentResize(false);
     });
     document.getElementById('btn-minimize-chat').addEventListener('click', closeChatWindow);
     document.getElementById('btn-reset-chat').addEventListener('click', startConversation);
